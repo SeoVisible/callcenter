@@ -1,0 +1,107 @@
+@import url('https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&display=swap');
+
+@import "tailwindcss";
+@import "tw-animate-css";
+
+
+:root {
+  --radius: 0.625rem;
+  --background: #f5f7fc;
+  --foreground: #37445c;
+  --card: #f5f7fc;
+  --card-foreground: #37445c;
+  --popover: #f5f7fc;
+  --popover-foreground: #37445c;
+  --primary: #37445c;
+  --primary-foreground: #f5f7fc;
+  --secondary: #ff1901;
+  --secondary-foreground: #f5f7fc;
+  --muted: #e5e8f0;
+  --muted-foreground: #37445c;
+  --accent: #ff1901;
+  --accent-foreground: #f5f7fc;
+  --destructive: #ff1901;
+  --border: #e5e8f0;
+  --input: #e5e8f0;
+  --ring: #37445c;
+  --chart-1: #37445c;
+  --chart-2: #ff1901;
+  --chart-3: #f5f7fc;
+  --chart-4: #e5e8f0;
+  --chart-5: #bfc8dc;
+  --sidebar: #f5f7fc;
+  --sidebar-foreground: #37445c;
+  --sidebar-primary: #37445c;
+  --sidebar-primary-foreground: #f5f7fc;
+  --sidebar-accent: #ff1901;
+  --sidebar-accent-foreground: #f5f7fc;
+  --sidebar-border: #e5e8f0;
+  --sidebar-ring: #37445c;
+}
+
+.dark {
+  --background: #37445c;
+  --foreground: #f5f7fc;
+  --card: #37445c;
+  --card-foreground: #f5f7fc;
+  --popover: #37445c;
+  --popover-foreground: #f5f7fc;
+  --primary: #f5f7fc;
+  --primary-foreground: #37445c;
+  --secondary: #ff1901;
+  --secondary-foreground: #f5f7fc;
+  --muted: #2c3546;
+  --muted-foreground: #f5f7fc;
+  --accent: #ff1901;
+  --accent-foreground: #f5f7fc;
+  --destructive: #ff1901;
+  --border: #2c3546;
+  --input: #2c3546;
+  --ring: #f5f7fc;
+  --chart-1: #f5f7fc;
+  --chart-2: #ff1901;
+  --chart-3: #37445c;
+  --chart-4: #2c3546;
+  --chart-5: #bfc8dc;
+  --sidebar: #37445c;
+  --sidebar-foreground: #f5f7fc;
+  --sidebar-primary: #f5f7fc;
+  --sidebar-primary-foreground: #37445c;
+  --sidebar-accent: #ff1901;
+  --sidebar-accent-foreground: #f5f7fc;
+  --sidebar-border: #2c3546;
+  --sidebar-ring: #f5f7fc;
+}
+
+
+* {
+  font-family: 'Jost', sans-serif !important;
+  border-color: var(--border);
+  outline-color: var(--ring);
+}
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.btn-primary,
+button[type="submit"],
+button[data-slot="button"][data-variant="default"] {
+  background: #ff1901 !important;
+  color: #fff !important;
+  border-radius: 16px !important;
+  font-family: 'Jost', sans-serif !important;
+  font-size: 1.25rem !important;
+  font-weight: 500 !important;
+  padding: 0.75rem 2.5rem !important;
+  min-width: 180px;
+  min-height: 60px;
+  box-shadow: none !important;
+  border: none !important;
+  transition: background 0.2s;
+}
+.btn-primary:hover,
+button[type="submit"]:hover,
+button[data-slot="button"][data-variant="default"]:hover {
+  background: #e21800 !important;
+}
