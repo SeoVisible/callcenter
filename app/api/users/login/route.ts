@@ -15,6 +15,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
   }
   // Do not return password in response
-  const { password: _, ...userData } = user
+  const { password: _unused, ...userData } = user
   return NextResponse.json(userData)
 }

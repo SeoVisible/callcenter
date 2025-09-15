@@ -15,7 +15,7 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
       where: { id },
       data,
     });
-    const { password, ...userSafe } = user;
+  const { password: _unused, ...userSafe } = user;
     return NextResponse.json(userSafe);
   } catch (error) {
     return NextResponse.json({ error: "Failed to update user" }, { status: 500 });

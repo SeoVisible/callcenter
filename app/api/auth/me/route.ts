@@ -16,8 +16,8 @@ export async function GET(req: Request) {
     // Optionally, fetch user from DB for fresh data
     const user = await prisma.user.findUnique({ where: { id: payload.id } })
     if (!user) return NextResponse.json({ user: null }, { status: 200 })
-    const { password, ...userSafe } = user
-    return NextResponse.json({ user: userSafe })
+  const { password: _unused, ...userSafe } = user
+  return NextResponse.json({ user: userSafe })
   } catch {
     return NextResponse.json({ user: null }, { status: 200 })
   }

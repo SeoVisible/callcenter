@@ -19,7 +19,7 @@ function computeTotals(invoice: InvoiceWithRelations) {
   return { subtotal, taxAmount, total, lineItemsWithTotal }
 }
 
-function addClientFields(invoice: InvoiceWithRelations | (InvoiceWithRelations & { subtotal: number, taxAmount: number, total: number, lineItems: any[] })) {
+function addClientFields(invoice: InvoiceWithRelations | (InvoiceWithRelations & { subtotal: number, taxAmount: number, total: number, lineItems: PrismaInvoiceItem[] })) {
   return {
     ...invoice,
     clientName: invoice.client?.name || "",

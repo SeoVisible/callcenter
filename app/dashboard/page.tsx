@@ -205,7 +205,7 @@ export default function DashboardPage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Welcome back, {user?.name}!</h1>
-          <p className="text-muted-foreground mt-2">Here's an overview of your system access and capabilities.</p>
+          <p className="text-muted-foreground mt-2">Here&apos;s an overview of your system access and capabilities.</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

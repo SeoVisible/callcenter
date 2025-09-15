@@ -184,8 +184,8 @@ export function ClientList({ onAddClient, onEditClient }: ClientListProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Client</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{deleteClient?.name}" from{" "}
-              {deleteClient?.company}? This action cannot be undone and will affect
+              Are you sure you want to delete &quot;{deleteClient?.name}&quot; from{" "}
+              {deleteClient?.company}&quot;? This action cannot be undone and will affect
               any associated invoices.
             </AlertDialogDescription>
           </AlertDialogHeader>

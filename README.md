@@ -31,8 +31,47 @@ cd callcenter
 
 ## 2. Install Dependencies
 
+Install all project dependencies (including Tailwind CSS, PostCSS, and animation utilities):
+
 ```bash
 npm install
+```
+
+If you ever need to install Tailwind and related packages manually, use:
+
+```bash
+# Core Tailwind CSS
+npm install -D tailwindcss
+
+# PostCSS (for Tailwind processing)
+npm install -D @tailwindcss/postcss
+
+# Animation utilities
+npm install -D tw-animate-css
+```
+
+> **Note:** All of these are already included in this project. You only need to run these if you are setting up Tailwind from scratch or updating packages.
+
+---
+
+## 2.1. Tailwind CSS Configuration
+
+Tailwind is already configured for you:
+
+- `tailwind.config.js` — Tailwind config (content paths, theme, etc.)
+- `postcss.config.mjs` — PostCSS config for Tailwind
+- `app/globals.css` — Imports Tailwind and tw-animate-css
+
+If you add new folders with components, update `tailwind.config.js` to include their paths.
+
+---
+
+## 2.2. Using Animations
+
+You can use animation classes from `tw-animate-css` directly in your JSX:
+
+```html
+<div class="animate-in fade-in zoom-in">...</div>
 ```
 
 ## 3. Configure Environment Variables

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
-// @ts-ignore
+// @ts-expect-error: nodemailer has no types for ESM import
 import nodemailer from "nodemailer"
 
 const prisma = new PrismaClient()
