@@ -57,9 +57,13 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  let data;
   try {
-    const data = await req.json()
-
+    data = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid or empty JSON body" }, { status: 400 });
+  }
+  try {
     // Validate required fields
     const requiredFields = [
       "clientId",
@@ -68,16 +72,16 @@ export async function POST(req: Request) {
       "taxRate",
       "notes",
       "createdBy"
-    ]
+    ];
     for (const field of requiredFields) {
       if (data[field] === undefined || data[field] === null) {
-        return NextResponse.json({ error: `Missing required field: ${field}` }, { status: 400 })
+        return NextResponse.json({ error: `Missing required field: ${field}` }, { status: 400 });
       }
     }
 
     // Validate lineItems
     if (!Array.isArray(data.lineItems) || data.lineItems.length === 0) {
-      return NextResponse.json({ error: "At least one line item is required" }, { status: 400 })
+      return NextResponse.json({ error: "At least one line item is required" }, { status: 400 });
     }
 
     // Prepare lineItems for nested create
@@ -87,7 +91,7 @@ export async function POST(req: Request) {
       description: item.description,
       quantity: item.quantity,
       unitPrice: item.unitPrice,
-    }))
+    }));
 
     // Create invoice with nested lineItems
     const invoice = await prisma.invoice.create({
@@ -103,11 +107,11 @@ export async function POST(req: Request) {
         }
       },
       include: { lineItems: true, client: true }
-    })
-    const { subtotal, taxAmount, total, lineItemsWithTotal } = computeTotals(invoice)
-    return NextResponse.json(addClientFields({ ...invoice, subtotal, taxAmount, total, lineItems: lineItemsWithTotal }))
+    });
+    const { subtotal, taxAmount, total, lineItemsWithTotal } = computeTotals(invoice);
+    return NextResponse.json(addClientFields({ ...invoice, subtotal, taxAmount, total, lineItems: lineItemsWithTotal }));
   } catch (err: unknown) {
     const message = err && typeof err === 'object' && 'message' in err ? (err as { message?: string }).message : undefined;
-    return NextResponse.json({ error: message || "Failed to create invoice" }, { status: 500 })
+    return NextResponse.json({ error: message || "Failed to create invoice" }, { status: 500 });
   }
 }
