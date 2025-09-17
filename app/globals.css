@@ -37,6 +37,9 @@
   --sidebar-accent-foreground: #f5f7fc;
   --sidebar-border: #e5e8f0;
   --sidebar-ring: #37445c;
+  /* hover/active tokens for sidebar menu items */
+  --sidebar-item-hover: #f5f7fc;
+  --sidebar-item-active: #f5f7fc;
 }
 
 .dark {
@@ -71,6 +74,9 @@
   --sidebar-accent-foreground: #f5f7fc;
   --sidebar-border: #2c3546;
   --sidebar-ring: #f5f7fc;
+  /* dark-mode hover/active values for sidebar menu items */
+  --sidebar-item-hover: #1f2937; /* dark gray similar to Tailwind gray-800 */
+  --sidebar-item-active: #2c3546;
 }
 
 
@@ -84,24 +90,92 @@ body {
   color: var(--foreground);
 }
 
-.btn-primary,
-button[type="submit"],
-button[data-slot="button"][data-variant="default"] {
+.btn-primary {
+  /* Keep .btn-primary as a color shortcut, but do NOT force sizing. The
+     shared Button component and [data-slot="button"] normalization will
+     control padding/height/rounding so buttons are consistent across the app. */
   background: #ff1901 !important;
   color: #fff !important;
-  border-radius: 16px !important;
-  font-family: 'Jost', sans-serif !important;
-  font-size: 1.25rem !important;
-  font-weight: 500 !important;
-  padding: 0.75rem 2.5rem !important;
-  min-width: 180px;
-  min-height: 60px;
-  box-shadow: none !important;
-  border: none !important;
   transition: background 0.2s;
 }
-.btn-primary:hover,
-button[type="submit"]:hover,
-button[data-slot="button"][data-variant="default"]:hover {
+.btn-primary:hover {
   background: #e21800 !important;
 }
+
+/* Normalized button layout (spacing, sizing, rounding) applied across all Button variants
+   but intentionally does NOT override background or text color variables. This keeps color
+   theming intact while making size/shape consistent. We apply these rules to any element
+   with data-slot="button" (not only native <button>) so components using `asChild` or
+   different wrappers keep consistent sizing. */
+[data-slot="button"] {
+  /* Preserve variant backgrounds; normalize sizing and type */
+  padding-top: 0.5rem !important;
+  padding-bottom: 0.5rem !important;
+  padding-left: 1rem !important;
+  padding-right: 1rem !important;
+  min-height: 40px;
+  border-radius: 10px !important;
+  font-size: 0.95rem !important;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Small / icon / sm variants adjustments */
+[data-slot="button"][data-size="sm"],
+[data-slot="button"][data-size="icon"] {
+  padding-top: 0.25rem !important;
+  padding-bottom: 0.25rem !important;
+  padding-left: 0.5rem !important;
+  padding-right: 0.5rem !important;
+  min-height: 32px;
+  border-radius: 8px !important;
+  font-size: 0.85rem !important;
+}
+
+/* Ensure full-width class still works */
+[data-slot="button"].w-full {
+  width: 100% !important;
+}
+
+/* Option B: make primary variant slightly less wide while keeping the
+   normalized height. This reduces horizontal padding for primary buttons
+   only so they remain prominent but not oversized. */
+[data-slot="button"][data-variant="default"] {
+  padding-left: 0.75rem !important;
+  padding-right: 0.75rem !important;
+  /* keep min-height from normalization; reduce font-size slightly if needed */
+  font-size: 0.92rem !important;
+}
+
+/* Sidebar-specific button alignment: left-justify label + icon for menu items */
+.dashboard-sidebar [data-slot="button"] {
+  justify-content: flex-start !important;
+  padding-left: 1.25rem !important; /* a bit more left padding for menu look */
+}
+
+/* Ensure icon within sidebar buttons keeps its spacing */
+.dashboard-sidebar [data-slot="button"] > svg,
+.dashboard-sidebar [data-slot="button"] > .mr-2 {
+  margin-right: 0.75rem !important;
+}
+
+/* Select visuals: ensure trigger matches dropdown (white) and dropdown search input looks integrated */
+[data-slot="select-trigger"] {
+  background: #ffffff !important;
+  color: var(--foreground) !important;
+  border-radius: 8px !important;
+}
+
+[data-slot="select-content"] {
+  background: #ffffff !important;
+  color: var(--foreground) !important;
+}
+
+[data-slot="select-content"] input[aria-label="Search options"] {
+  /* make the search input visually match site inputs */
+  border-color: var(--border) !important;
+  background: #ffffff !important;
+}
+

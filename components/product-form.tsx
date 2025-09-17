@@ -32,6 +32,7 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
     category: "",
     sku: "",
     isGlobal: false,
+    stock: "0",
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -47,6 +48,7 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
         category: product.category,
         sku: product.sku,
         isGlobal: product.isGlobal,
+        stock: (product as any).stock?.toString() ?? "0",
       })
     } else {
       // Set default isGlobal based on user role
@@ -68,6 +70,13 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
       return
     }
 
+    // Only superadmin may create global products; normal users are not allowed to create products in production
+    if (!product && user.role !== "superadmin") {
+      setError("You do not have permission to create products")
+      setLoading(false)
+      return
+    }
+
     try {
       const price = Number.parseFloat(formData.price)
       if (isNaN(price) || price < 0) {
@@ -81,6 +90,7 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
           name: formData.name,
           description: formData.description,
           price,
+          stock: Number.parseInt(formData.stock || "0"),
           category: formData.category,
           sku: formData.sku,
         }
@@ -94,6 +104,7 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
           name: formData.name,
           description: formData.description,
           price,
+          stock: Number.parseInt(formData.stock || "0"),
           category: formData.category,
           sku: formData.sku,
           createdBy: user.id,
@@ -188,6 +199,19 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
                 value={formData.price}
                 onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                 placeholder="0.00"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="stock">Stock</Label>
+              <Input
+                id="stock"
+                type="number"
+                step="1"
+                min="0"
+                value={formData.stock}
+                onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                placeholder="0"
                 required
               />
             </div>

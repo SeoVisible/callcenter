@@ -42,6 +42,8 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
       const data = await invoiceService.getAllInvoices(user?.id, user?.role)
       setInvoices(data)
     } catch {
+      // Log to console to aid debugging in dev. The UI shows a toast too.
+      console.error("InvoiceList: failed to load invoices")
       toast.error("Failed to load invoices")
     } finally {
       setLoading(false)

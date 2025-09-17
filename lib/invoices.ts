@@ -60,7 +60,7 @@ class InvoiceService {
     if (userId && userRole) {
       url += `?userId=${encodeURIComponent(userId)}&userRole=${encodeURIComponent(userRole)}`
     }
-    const res = await fetch(url)
+    const res = await fetch(url, { credentials: "include" })
     if (!res.ok) {
       const data = await res.json()
       throw new Error(data.error || "Failed to fetch invoices")
@@ -69,7 +69,7 @@ class InvoiceService {
   }
 
   async getInvoiceById(id: string): Promise<Invoice | null> {
-    const res = await fetch(`/api/invoices/${id}`)
+    const res = await fetch(`/api/invoices/${id}`, { credentials: "include" })
     if (!res.ok) return null
     return res.json()
   }
@@ -79,6 +79,7 @@ class InvoiceService {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(invoiceData),
+      credentials: "include",
     })
     if (!res.ok) {
       const data = await res.json()
@@ -92,6 +93,7 @@ class InvoiceService {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(invoiceData),
+      credentials: "include",
     })
     if (!res.ok) {
       const data = await res.json()
@@ -102,7 +104,8 @@ class InvoiceService {
 
   async deleteInvoice(id: string): Promise<void> {
     const res = await fetch(`/api/invoices/${id}`, {
-      method: "DELETE"
+      method: "DELETE",
+      credentials: "include",
     })
     if (!res.ok) {
       const data = await res.json()
@@ -112,7 +115,8 @@ class InvoiceService {
 
   async sendInvoice(id: string): Promise<{ previewUrl?: string }> {
     const res = await fetch(`/api/invoices/${id}/send`, {
-      method: "POST"
+      method: "POST",
+      credentials: "include",
     })
     if (!res.ok) {
       const data = await res.json()

@@ -20,12 +20,14 @@ export function DashboardLayout({ children, activeSection, onSectionChange }: Da
 
   const navigationItems = [
     { id: "dashboard", label: "Dashboard", icon: FileText, roles: ["superadmin", "user"] },
-    { id: "users", label: "User Management", icon: Users, roles: ["superadmin", "user"] },
+    // Only show User Management to superadmin in production environment
+    { id: "users", label: "User Management", icon: Users, roles: ["superadmin"] },
     { id: "products", label: "Products", icon: Package, roles: ["superadmin", "user"] },
     { id: "clients", label: "Clients", icon: UserCheck, roles: ["superadmin", "user"] },
     { id: "invoices", label: "Invoices", icon: FileText, roles: ["superadmin", "user"] },
   ]
 
+  // Fallback to 'user' role when no user is present; only include items that match the user's role
   const availableItems = navigationItems.filter((item) => item.roles.includes(user?.role || "user"))
 
   const handleLogout = async () => {
@@ -44,7 +46,7 @@ export function DashboardLayout({ children, activeSection, onSectionChange }: Da
       {/* Sidebar */}
       <div
         className={cn(
-          "fixed inset-y-0 left-0 z-40 w-[280px] bg-white border-r border-[#e5e8f0] transform transition-transform duration-200 ease-in-out lg:translate-x-0",
+          "dashboard-sidebar fixed inset-y-0 left-0 z-40 w-[280px] bg-white border-r border-[#e5e8f0] transform transition-transform duration-200 ease-in-out lg:translate-x-0",
           sidebarOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
@@ -75,8 +77,8 @@ export function DashboardLayout({ children, activeSection, onSectionChange }: Da
                   className={cn(
                     "w-full justify-start rounded-xl px-4 py-2 text-base font-medium transition-all group",
                     isActive
-                      ? "bg-[#f5f7fc] text-[#ff1901] shadow-none"
-                      : "text-[#37445c] hover:bg-[#f5f7fc] hover:text-[#ff1901] focus:bg-[#f5f7fc] focus:text-[#ff1901]"
+                      ? "bg-[var(--sidebar-item-active)] text-[#ff1901] shadow-none"
+                      : `text-[var(--sidebar-foreground)] hover:bg-[var(--sidebar-item-hover)] hover:text-[#ff1901] focus:bg-[var(--sidebar-item-hover)] focus:text-[#ff1901]`
                   )}
                   style={{}}
                   onClick={() => {

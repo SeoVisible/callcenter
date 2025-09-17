@@ -27,6 +27,7 @@ model Product {
     name         String
     description  String
     price        Float
+    stock        Int           @default(0)
     category     String
     sku          String
     createdBy    String

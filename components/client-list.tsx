@@ -111,7 +111,7 @@ export function ClientList({ onAddClient, onEditClient }: ClientListProps) {
               {clients.map((client) => (
                 <TableRow
                   key={client.id}
-                  className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                  className="cursor-pointer hover:bg-gray-100 dark:hover:bg-[var(--sidebar-item-hover)]"
                   onClick={() => onEditClient(client)}
                 >
                   <TableCell>

@@ -3,6 +3,7 @@ export interface Product {
   name: string
   description: string
   price: number
+  stock: number
   category: string
   sku: string
   createdBy: string // User ID who created the product
@@ -15,6 +16,7 @@ export interface CreateProductData {
   name: string
   description: string
   price: number
+  stock?: number
   category: string
   sku: string
   createdBy: string
@@ -25,6 +27,7 @@ export interface UpdateProductData {
   name?: string
   description?: string
   price?: number
+  stock?: number
   category?: string
   sku?: string
 }
@@ -62,7 +65,7 @@ class ProductService {
     const res = await fetch(`/api/products/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(productData),
+      body: JSON.stringify({ id, ...productData }),
     })
     if (!res.ok) {
       const data = await res.json()

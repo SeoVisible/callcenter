@@ -1,0 +1,1 @@
+ALTER TABLE "Product" ADD COLUMN "stock" integer DEFAULT 0 NOT NULL;

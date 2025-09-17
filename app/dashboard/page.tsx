@@ -13,6 +13,7 @@ import { InvoiceList } from "@/components/invoice-list"
 import { InvoiceForm } from "@/components/invoice-form"
 import { InvoiceView } from "@/components/invoice-view"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { DashboardHome } from "@/components/dashboard-home"
 import { useAuth } from "@/contexts/auth-context"
 import type { User } from "@/lib/auth"
 import type { Product } from "@/lib/products"
@@ -200,110 +201,8 @@ export default function DashboardPage() {
       )
     }
 
-    // Default dashboard view
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Welcome back, {user?.name}!</h1>
-          <p className="text-muted-foreground mt-2">Here&apos;s an overview of your system access and capabilities.</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {user?.role === "superadmin" && (
-            <Card
-              className="cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => setActiveSection("users")}
-            >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">User Management</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">Full Access</div>
-                <p className="text-xs text-muted-foreground">Manage all users and roles</p>
-              </CardContent>
-            </Card>
-          )}
-
-          <Card
-            className="cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => setActiveSection("products")}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Products</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{user?.role === "superadmin" ? "Full Access" : "Limited Access"}</div>
-              <p className="text-xs text-muted-foreground">
-                {user?.role === "superadmin" ? "Add, edit, delete all products" : "Add products for your clients"}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card
-            className="cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => setActiveSection("clients")}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Clients</CardTitle>
-              <UserCheck className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">Full Access</div>
-              <p className="text-xs text-muted-foreground">View, add, edit, delete clients</p>
-            </CardContent>
-          </Card>
-
-          <Card
-            className="cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => setActiveSection("invoices")}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Invoices</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">Full Access</div>
-              <p className="text-xs text-muted-foreground">View, create, send, edit invoices</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-4 border rounded-lg">
-                <h3 className="font-medium mb-2">Add New Client</h3>
-                <p className="text-sm text-muted-foreground mb-3">Create a new client profile</p>
-                <button className="text-sm text-primary hover:underline" onClick={() => setActiveSection("clients")}>
-                  Get Started →
-                </button>
-              </div>
-              <div className="p-4 border rounded-lg">
-                <h3 className="font-medium mb-2">Create Invoice</h3>
-                <p className="text-sm text-muted-foreground mb-3">Generate a new invoice</p>
-                <button className="text-sm text-primary hover:underline" onClick={() => setActiveSection("invoices")}>
-                  Get Started →
-                </button>
-              </div>
-              {user?.role === "superadmin" && (
-                <div className="p-4 border rounded-lg">
-                  <h3 className="font-medium mb-2">Manage Users</h3>
-                  <p className="text-sm text-muted-foreground mb-3">Add or edit user accounts</p>
-                  <button className="text-sm text-primary hover:underline" onClick={() => setActiveSection("users")}>
-                    Get Started →
-                  </button>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
+    // Default dashboard view: show DashboardHome (graphs/statistics)
+    return <DashboardHome />
   }
 
   return (

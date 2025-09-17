@@ -1,0 +1,86 @@
+import { NextResponse } from "next/server"
+import { PrismaClient } from "@prisma/client"
+
+const prisma = new PrismaClient()
+
+export async function GET() {
+  const errors: Array<{ key: string; message: string }> = []
+  const result: any = {
+    users: null,
+    products: null,
+    clients: null,
+    invoices: null,
+    invoicesByStatus: { pending: null, sent: null, paid: null },
+    productsByScope: { global: null, personal: null },
+    errors: [] as Array<{ key: string; message: string }>,
+  }
+
+  // Quick connectivity check: if DB is unreachable, return mock data so the dashboard can render
+  try {
+    await prisma.$queryRaw`SELECT 1`
+  } catch (err: unknown) {
+    const message = err && typeof err === 'object' && 'message' in err ? (err as { message?: string }).message : String(err)
+    const mock = {
+      users: 0,
+      products: 0,
+      clients: 0,
+      invoices: 0,
+      invoicesByStatus: { pending: 0, sent: 0, paid: 0 },
+      productsByScope: { global: 0, personal: 0 },
+      errors: [{ key: "db", message: `DB unreachable: ${message}` }],
+      mock: true,
+    }
+    return NextResponse.json(mock)
+  }
+
+  try {
+    result.users = await prisma.user.count()
+  } catch (err: unknown) {
+    const message = err && typeof err === 'object' && 'message' in err ? (err as { message?: string }).message : String(err)
+    errors.push({ key: "users", message: message ?? "unknown error" })
+  }
+
+  try {
+    result.products = await prisma.product.count()
+  } catch (err: unknown) {
+    const message = err && typeof err === 'object' && 'message' in err ? (err as { message?: string }).message : String(err)
+    errors.push({ key: "products", message: message ?? "unknown error" })
+  }
+
+  try {
+    result.clients = await prisma.client.count()
+  } catch (err: unknown) {
+    const message = err && typeof err === 'object' && 'message' in err ? (err as { message?: string }).message : String(err)
+    errors.push({ key: "clients", message: message ?? "unknown error" })
+  }
+
+  try {
+    result.invoices = await prisma.invoice.count()
+  } catch (err: unknown) {
+    const message = err && typeof err === 'object' && 'message' in err ? (err as { message?: string }).message : String(err)
+    errors.push({ key: "invoices", message: message ?? "unknown error" })
+  }
+
+  // invoices by status
+  try {
+    result.invoicesByStatus.pending = await prisma.invoice.count({ where: { status: "pending" } })
+    result.invoicesByStatus.sent = await prisma.invoice.count({ where: { status: "sent" } })
+    result.invoicesByStatus.paid = await prisma.invoice.count({ where: { status: "paid" } })
+  } catch (err: unknown) {
+    const message = err && typeof err === 'object' && 'message' in err ? (err as { message?: string }).message : String(err)
+    errors.push({ key: "invoicesByStatus", message: message ?? "unknown error" })
+  }
+
+  // products by scope
+  try {
+    result.productsByScope.global = await prisma.product.count({ where: { isGlobal: true } })
+    result.productsByScope.personal = await prisma.product.count({ where: { isGlobal: false } })
+  } catch (err: unknown) {
+    const message = err && typeof err === 'object' && 'message' in err ? (err as { message?: string }).message : String(err)
+    errors.push({ key: "productsByScope", message: message ?? "unknown error" })
+  }
+
+  result.errors = errors
+
+  return NextResponse.json(result)
+}

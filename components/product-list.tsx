@@ -96,10 +96,12 @@ export function ProductList({ onAddProduct, onEditProduct }: ProductListProps) {
               {user?.role === "superadmin" ? "Manage all products globally" : "Manage products for your clients"}
             </p>
           </div>
-          <Button onClick={onAddProduct}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Product
-          </Button>
+          {user?.role === "superadmin" && (
+            <Button onClick={onAddProduct}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Product
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           <Table>
@@ -107,6 +109,7 @@ export function ProductList({ onAddProduct, onEditProduct }: ProductListProps) {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>SKU</TableHead>
+                <TableHead>Stock</TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead>Price</TableHead>
                 <TableHead>Scope</TableHead>
@@ -123,6 +126,7 @@ export function ProductList({ onAddProduct, onEditProduct }: ProductListProps) {
                     </div>
                   </TableCell>
                   <TableCell className="font-mono text-sm">{product.sku}</TableCell>
+                  <TableCell className="font-mono text-sm">{(product as any).stock ?? 0}</TableCell>
                   <TableCell>
                     <Badge variant="outline">{product.category}</Badge>
                   </TableCell>

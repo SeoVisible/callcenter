@@ -1,0 +1,286 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+
+interface Stats {
+  users: number
+  products: number
+  clients: number
+  invoices: number
+  invoicesByStatus: { pending: number; sent: number; paid: number }
+  productsByScope: { global: number; personal: number }
+}
+
+export function DashboardHome() {
+  const [stats, setStats] = useState<Stats | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [info, setInfo] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      try {
+        const res = await fetch("/api/stats")
+        if (!res.ok) throw new Error("Failed to fetch stats")
+        const data = await res.json()
+
+        // Map nullable results to zero when null
+        const newStats: Stats = {
+          users: data.users ?? 0,
+          products: data.products ?? 0,
+          clients: data.clients ?? 0,
+          invoices: data.invoices ?? 0,
+          invoicesByStatus: {
+            pending: data.invoicesByStatus?.pending ?? 0,
+            sent: data.invoicesByStatus?.sent ?? 0,
+            paid: data.invoicesByStatus?.paid ?? 0,
+          },
+          productsByScope: {
+            global: data.productsByScope?.global ?? 0,
+            personal: data.productsByScope?.personal ?? 0,
+          },
+        }
+
+        // Debug: surface raw and normalized stats in console for troubleshooting
+        console.debug("DashboardHome: raw stats response:", data)
+        console.debug("DashboardHome: normalized stats:", newStats)
+
+        if (!cancelled) setStats(newStats)
+
+        if (data.mock) {
+          // Non-fatal informational message when using mock data
+          const msgs = data.errors && Array.isArray(data.errors) ? data.errors.map((e: any) => `${e.key}: ${e.message}`) : []
+          if (!cancelled) setInfo(`Using mock data: ${msgs.join("; ")}`)
+        } else if (data.errors && Array.isArray(data.errors) && data.errors.length > 0) {
+          const msgs = data.errors.map((e: any) => `${e.key}: ${e.message}`)
+          if (!cancelled) setInfo(`Partial errors: ${msgs.join("; ")}`)
+        } else {
+          if (!cancelled) setInfo(null)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          // Use a safe fallback so graphs render even if the API fails
+          setInfo("Failed to load stats from API — showing fallback values")
+          setStats({
+            users: 0,
+            products: 0,
+            clients: 0,
+            invoices: 0,
+            invoicesByStatus: { pending: 0, sent: 0, paid: 0 },
+            productsByScope: { global: 0, personal: 0 },
+          })
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="min-h-[300px] flex items-center justify-center">
+        <div className="text-sm text-muted-foreground">Loading dashboard...</div>
+      </div>
+    )
+  }
+
+  if (!stats) {
+    // Fatal: no stats at all (e.g., network failure). Show error and retry.
+    return (
+      <div className="space-y-4">
+        <div className="p-4 bg-red-50 border border-red-200 rounded">
+          <div className="flex items-start justify-between">
+            <div className="text-sm text-red-700">
+              <strong>Could not load statistics.</strong>
+              <div className="text-xs text-red-600 mt-1">{error || "Failed to load stats"}</div>
+            </div>
+            <div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-white hover:bg-gray-50 border"
+                onClick={async () => {
+                  setError(null)
+                  setLoading(true)
+                  try {
+                    const res = await fetch("/api/stats")
+                    if (!res.ok) throw new Error("Failed to fetch stats")
+                    const data = await res.json()
+                    const newStats: Stats = {
+                      users: data.users ?? 0,
+                      products: data.products ?? 0,
+                      clients: data.clients ?? 0,
+                      invoices: data.invoices ?? 0,
+                      invoicesByStatus: {
+                        pending: data.invoicesByStatus?.pending ?? 0,
+                        sent: data.invoicesByStatus?.sent ?? 0,
+                        paid: data.invoicesByStatus?.paid ?? 0,
+                      },
+                      productsByScope: {
+                        global: data.productsByScope?.global ?? 0,
+                        personal: data.productsByScope?.personal ?? 0,
+                      },
+                    }
+                    setStats(newStats)
+                    if (data.mock) {
+                      const msgs = data.errors && Array.isArray(data.errors) ? data.errors.map((e: any) => `${e.key}: ${e.message}`) : []
+                      setInfo(`Using mock data: ${msgs.join("; ")}`)
+                    } else if (data.errors && data.errors.length) {
+                      const msgs = data.errors.map((e: any) => `${e.key}: ${e.message}`)
+                      setInfo(`Partial errors: ${msgs.join("; ")}`)
+                    } else {
+                      setInfo(null)
+                    }
+                  } catch (err) {
+                      // On retry failure, show fallback stats so graphs still display
+                      setInfo("Retry failed — showing fallback values")
+                      setStats({
+                        users: 0,
+                        products: 0,
+                        clients: 0,
+                        invoices: 0,
+                        invoicesByStatus: { pending: 0, sent: 0, paid: 0 },
+                        productsByScope: { global: 0, personal: 0 },
+                      })
+                  } finally {
+                    setLoading(false)
+                  }
+                }}
+              >
+                Retry
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <div className="min-h-[300px] flex items-center justify-center">
+          <div className="text-sm text-muted-foreground">{error || "Failed to load stats"}</div>
+        </div>
+      </div>
+    )
+  }
+
+  const { users, products, clients, invoices, invoicesByStatus, productsByScope } = stats
+
+  // Debug: computed chart values
+  console.debug("DashboardHome: invoicesByStatus:", invoicesByStatus)
+
+  // Simple bar chart for invoices
+  const invoiceStatusValues = [invoicesByStatus.pending, invoicesByStatus.sent, invoicesByStatus.paid]
+  const invoiceMax = Math.max(...invoiceStatusValues, 1)
+
+  console.debug("DashboardHome: invoiceStatusValues", invoiceStatusValues, "invoiceMax", invoiceMax)
+
+  // Simple pie data for product scope
+  const totalScope = productsByScope.global + productsByScope.personal || 1
+  const globalAngle = (productsByScope.global / totalScope) * 360
+
+  return (
+    <div className="space-y-6">
+      {info && (
+        <div className="p-3 bg-yellow-50 border border-yellow-200 rounded">
+          <div className="text-sm text-yellow-800">{info}</div>
+        </div>
+      )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Users</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{users}</div>
+            <div className="text-sm text-muted-foreground">Total user accounts</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Products</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{products}</div>
+            <div className="text-sm text-muted-foreground">Total products</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Clients</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{clients}</div>
+            <div className="text-sm text-muted-foreground">Total clients</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Invoices</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{invoices}</div>
+            <div className="text-sm text-muted-foreground">Total invoices</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Invoices by status</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="mt-2 space-y-4">
+              <div className="flex items-end gap-4 h-36">
+                {['pending','sent','paid'].map((k, i) => {
+                  const value = (invoiceStatusValues as any)[i]
+                  const height = Math.round((value / invoiceMax) * 100)
+                  return (
+                    <div key={k} className="flex flex-col items-center w-1/3">
+                      <div className="w-full bg-slate-100 rounded-b-md flex items-end" style={{ height: '100%' }}>
+                        <div className="bg-indigo-500 w-full rounded-t-md" style={{ height: `${height}%` }} />
+                      </div>
+                      <div className="text-sm mt-2 capitalize">{k} ({value})</div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Product scope</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-6">
+              <svg width="120" height="120" viewBox="0 0 32 32" className="flex-shrink-0">
+                <circle r="16" cx="16" cy="16" fill="#e6e7eb" />
+                <path
+                  d={`M16 16 L16 0 A16 16 0 ${globalAngle > 180 ? 1 : 0} 1 ${16 + 16 * Math.sin((globalAngle * Math.PI) / 180)} ${16 - 16 * Math.cos((globalAngle * Math.PI) / 180)} Z`}
+                  fill="#0369a1"
+                />
+                <circle r="10" cx="16" cy="16" fill="#ffffff" />
+              </svg>
+
+              <div>
+                <div className="text-lg font-medium">Global: {productsByScope.global}</div>
+                <div className="text-sm text-muted-foreground mb-2">Personal: {productsByScope.personal}</div>
+                <div className="text-xs text-muted-foreground">Total products: {products}</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}

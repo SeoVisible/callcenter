@@ -338,7 +338,7 @@ export function ClientForm({ client, onSuccess, onCancel, onViewInvoice }: Clien
                 {clientInvoices.map(inv => (
                   <TableRow
                     key={inv.id}
-                    className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                    className="cursor-pointer hover:bg-gray-100 dark:hover:bg-[var(--sidebar-item-hover)]"
                     onClick={() => onViewInvoice && onViewInvoice(inv)}
                   >
                     <TableCell>{inv.invoiceNumber || inv.id.slice(0, 8)}</TableCell>
