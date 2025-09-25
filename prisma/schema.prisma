@@ -1,88 +1,71 @@
-// This file contains the Prisma schema for your project.
-// Update the datasource url with your PostgreSQL connection string.
+generator client {
+  provider = "prisma-client-js"
+}
 
 datasource db {
-    provider = "postgresql"
-    url      = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
-
-generator client {
-    provider = "prisma-client-js"
-}
-
-// Example User model. Add more fields as needed.
 
 model User {
-    id       String    @id @default(uuid())
-    name     String
-    email    String    @unique
-    password String
-    role     String
-    products Product[] @relation("UserProducts")
-    invoices Invoice[] @relation("UserInvoices")
+  id       String    @id @default(uuid())
+  name     String
+  email    String    @unique
+  password String
+  role     String
+  invoices Invoice[] @relation("UserInvoices")
+  products Product[] @relation("UserProducts")
 }
 
 model Product {
-    id           String        @id @default(uuid())
-    name         String
-    description  String
-    price        Float
-    stock        Int           @default(0)
-    category     String
-    sku          String
-    createdBy    String
-    isGlobal     Boolean
-    user         User?         @relation("UserProducts", fields: [createdBy], references: [id])
-    invoiceItems InvoiceItem[]
+  id           String        @id @default(uuid())
+  name         String
+  description  String
+  price        Float
+  category     String
+  sku          String
+  createdBy    String
+  isGlobal     Boolean
+  invoiceItems InvoiceItem[]
+  user         User          @relation("UserProducts", fields: [createdBy], references: [id])
 }
 
 model Client {
-    id        String    @id @default(uuid())
-    name      String
-    email     String    @unique
-    phone     String
-    company   String?
-    address   Json
-    notes     String?
-    createdBy String
-    createdAt DateTime  @default(now())
-    invoices  Invoice[]
+  id        String    @id @default(uuid())
+  name      String
+  email     String    @unique
+  company   String?
+  address   Json
+  createdBy String
+  notes     String?
+  phone     String
+  createdAt DateTime  @default(now())
+  invoices  Invoice[]
 }
 
 model Invoice {
-    id        String        @id @default(uuid())
-    clientId  String
-    client    Client        @relation(fields: [clientId], references: [id])
-    createdBy String
-    user      User?         @relation("UserInvoices", fields: [createdBy], references: [id])
-    dueDate   DateTime
-    taxRate   Float
-    notes     String?
-    status    InvoiceStatus @default(pending)
-    lineItems InvoiceItem[]
-    sentAt    DateTime?
-    paidAt    DateTime?
-    createdAt DateTime      @default(now())
-    updatedAt DateTime      @updatedAt
-}
-
-enum InvoiceStatus {
-    pending
-    maker
-    sent
-    paid
-    not_paid
-    completed
+  id        String        @id @default(uuid())
+  clientId  String
+  createdBy String
+  dueDate   DateTime
+  taxRate   Float
+  notes     String?
+  status    String        @default("pending")
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  client    Client        @relation(fields: [clientId], references: [id])
+  user      User          @relation("UserInvoices", fields: [createdBy], references: [id])
+  lineItems InvoiceItem[]
 }
 
 model InvoiceItem {
-    id          String  @id @default(uuid())
-    invoiceId   String
-    invoice     Invoice @relation(fields: [invoiceId], references: [id])
-    productId   String
-    product     Product @relation(fields: [productId], references: [id])
-    productName String
-    description String?
-    quantity    Int
-    unitPrice   Float
+  id          String  @id @default(uuid())
+  invoiceId   String
+  productId   String
+  productName String
+  description String?
+  quantity    Int
+  unitPrice   Float
+  invoice     Invoice @relation(fields: [invoiceId], references: [id])
+  product     Product @relation(fields: [productId], references: [id])
 }
