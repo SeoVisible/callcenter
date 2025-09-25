@@ -5,14 +5,24 @@ const prisma = new PrismaClient()
 
 export async function GET() {
   const errors: Array<{ key: string; message: string }> = []
-  const result: any = {
+  type ResultShape = {
+    users: number | null
+    products: number | null
+    clients: number | null
+    invoices: number | null
+    invoicesByStatus: { pending: number | null; maker: number | null; sent: number | null; paid: number | null; not_paid: number | null; completed: number | null }
+    productsByScope: { global: number | null; personal: number | null }
+    errors: Array<{ key: string; message: string }>
+    [key: string]: unknown
+  }
+  const result: ResultShape = {
     users: null,
     products: null,
     clients: null,
     invoices: null,
     invoicesByStatus: { pending: null, maker: null, sent: null, paid: null, not_paid: null, completed: null },
     productsByScope: { global: null, personal: null },
-    errors: [] as Array<{ key: string; message: string }>,
+    errors: [],
   }
 
   // Quick connectivity check: if DB is unreachable, return mock data so the dashboard can render

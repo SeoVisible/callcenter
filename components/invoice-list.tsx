@@ -23,6 +23,13 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Plus, Edit, Trash2, Loader2, MoreHorizontal, Send, Eye, CheckCircle } from "lucide-react"
 import { toast } from "sonner"
 
+type InvoiceStatus = "pending" | "maker" | "sent" | "paid" | "not_paid" | "completed" | undefined
+const toInvoiceStatus = (s: unknown): InvoiceStatus => {
+  const v = String(s)
+  if (["pending","maker","sent","paid","not_paid","completed"].includes(v)) return v as InvoiceStatus
+  return undefined
+}
+
 interface InvoiceListProps {
   onAddInvoice: () => void
   onEditInvoice: (invoice: Invoice) => void
@@ -47,7 +54,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
     } catch {
       // Log to console to aid debugging in dev. The UI shows a toast too.
       console.error("InvoiceList: failed to load invoices")
-      toast.error("Failed to load invoices")
+      toast.error("Laden der Rechnungen fehlgeschlagen")
     } finally {
       setLoading(false)
     }
@@ -100,7 +107,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
   // Optionally, show previewUrl or refetch invoices
   toast.success("Invoice sent!", { description: result.previewUrl ? `Preview: ${result.previewUrl}` : undefined })
   // Optionally, reload invoices to update status
-  loadInvoices && loadInvoices()
+  void loadInvoices()
       toast.success(`Invoice sent to ${invoice.clientEmail}`)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to send invoice")
@@ -152,7 +159,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
     }
 
     if (!status) {
-      return <Badge variant="secondary" className="bg-gray-100 text-gray-800">Unknown</Badge>
+      return <Badge variant="secondary" className="bg-gray-100 text-gray-800">Unbekannt</Badge>
     }
     return (
       <Badge variant={variants[status]} className={colors[status]}>
@@ -174,20 +181,20 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle>Invoice Management</CardTitle>
+            <CardTitle>Rechnungsverwaltung</CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              {user?.role === "superadmin" ? "Manage all invoices in the system" : "Manage your invoices"}
+            {user?.role === "superadmin" ? "Verwalten Sie alle Rechnungen im System" : "Verwalten Sie Ihre Rechnungen"}
             </p>
           </div>
           <Button onClick={onAddInvoice}>
             <Plus className="mr-2 h-4 w-4" />
-            Create Invoice
+          Neue Rechnung
           </Button>
         </CardHeader>
         <CardContent>
           <div className="mb-4">
             <Input
-              placeholder="Search invoices by number, client, user, id or status..."
+            placeholder="Rechnungen nach Nummer, Kunde, Benutzer, ID oder Status suchen..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -195,14 +202,14 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Invoice #</TableHead>
-                <TableHead>Client</TableHead>
-                <TableHead>User</TableHead>
-                <TableHead>Amount</TableHead>
+                <TableHead>Rechnung #</TableHead>
+                <TableHead>Kunde</TableHead>
+                <TableHead>Benutzer</TableHead>
+                <TableHead>Betrag</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Invoice Date</TableHead>
-                <TableHead>Due Date</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>Rechnungsdatum</TableHead>
+                <TableHead>Fälligkeitsdatum</TableHead>
+                <TableHead className="text-right">Aktionen</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -224,6 +231,9 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
                   <TableCell>
                     <div className="font-medium">${typeof invoice.total === 'number' ? invoice.total.toFixed(2) : '0.00'}</div>
                   </TableCell>
+                    <TableCell>
+                      <div className="font-medium">€{typeof invoice.total === 'number' ? invoice.total.toFixed(2) : '0.00'}</div>
+                    </TableCell>
                   <TableCell>{getStatusBadge(invoice.status)}</TableCell>
                   <TableCell>{new Date(invoice.createdAt).toLocaleDateString()}</TableCell>
                   <TableCell>
@@ -244,7 +254,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
                           {canEditInvoice(invoice) && (
                             <DropdownMenuItem onClick={() => onEditInvoice(invoice)}>
                               <Edit className="mr-2 h-4 w-4" />
-                              Edit
+                                Bearbeiten
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuItem
@@ -254,28 +264,28 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
                                 const result = await invoiceService.sendInvoice(invoice.id)
                                 setSendingId(null)
                                 if (result.previewUrl) {
-                                  toast.success('Invoice email sent! (Preview)', {
+                         toast.success('Rechnung gesendet! (Vorschau)', {
                                     description: (
-                                      <a href={result.previewUrl} target="_blank" rel="noopener noreferrer" className="underline text-blue-600">View Email</a>
+                            <a href={result.previewUrl} target="_blank" rel="noopener noreferrer" className="underline text-blue-600">E-Mail anzeigen</a>
                                     )
-                                  })
-                                } else {
-                                  toast.success('Invoice email sent!')
+                         })
+                        } else {
+                         toast.success('Rechnung gesendet!')
                                 }
                               } catch (error) {
                                 setSendingId(null)
-                                toast.error(error instanceof Error ? error.message : 'Failed to send invoice email')
+                                toast.error(error instanceof Error ? error.message : 'Fehler beim Senden der Rechnungs-E-Mail')
                               }
                             }}
                             disabled={sendingId === invoice.id}
                           >
                             <Send className="mr-2 h-4 w-4" />
-                            Email Invoice
+                            Rechnung senden
                           </DropdownMenuItem>
                           {/* Single Download submenu: Client PDF (with prices) and Maker PDF (no prices) */}
                           <DropdownMenuSub>
                             <DropdownMenuSubTrigger>
-                              Download PDF
+                      PDF herunterladen
                             </DropdownMenuSubTrigger>
                             <DropdownMenuSubContent>
                               <DropdownMenuItem onClick={async () => {
@@ -351,7 +361,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
 
                                 doc.save(`invoice-${invoice.id}.pdf`);
                               }}>
-                                Client PDF (with prices)
+                                Client PDF (mit Preisen)
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={async () => {
                                 // Maker PDF (no prices)
@@ -409,7 +419,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
 
                                 doc.save(`invoice-${invoice.id}-no-prices.pdf`);
                               }}>
-                                Maker PDF (no prices)
+                                Maker PDF (ohne Preise)
                               </DropdownMenuItem>
                             </DropdownMenuSubContent>
                           </DropdownMenuSub>
@@ -423,7 +433,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
                               ) : (
                                 <Send className="mr-2 h-4 w-4" />
                               )}
-                              Send Invoice
+                              Rechnung senden
                             </DropdownMenuItem>
                           )}
                           {canEditInvoice(invoice) && (invoice.status === "sent" || invoice.status === "not_paid") && (
@@ -436,25 +446,25 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
                               ) : (
                                 <CheckCircle className="mr-2 h-4 w-4" />
                               )}
-                              Mark as Paid
+                              Als bezahlt markieren
                             </DropdownMenuItem>
                           )}
                           {canDeleteInvoice(invoice) && (
                             <DropdownMenuItem onClick={() => setDeleteInvoice(invoice)} className="text-destructive">
                               <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
+                              Löschen
                             </DropdownMenuItem>
                           )}
                           <div className="border-t my-1" />
-                          <div className="px-2 text-xs text-muted-foreground">Change status</div>
+                          <div className="px-2 text-xs text-muted-foreground">Status ändern</div>
                           {['pending','maker','sent','paid','not_paid','completed'].map((s) => (
                             <DropdownMenuItem key={s} onClick={async () => {
                               try {
-                                await invoiceService.updateInvoice(invoice.id, { status: s as any })
-                                toast.success(`Status updated to ${s}`)
+                                await invoiceService.updateInvoice(invoice.id, { status: toInvoiceStatus(s) })
+                                toast.success(`Status aktualisiert: ${s}`)
                                 loadInvoices()
                               } catch (err) {
-                                toast.error(err instanceof Error ? err.message : 'Failed to update status')
+                                toast.error(err instanceof Error ? err.message : 'Statusaktualisierung fehlgeschlagen')
                               }
                             }}>
                               {s.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
@@ -470,7 +480,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
           </Table>
           {invoices.length === 0 && (
             <div className="text-center py-8">
-              <p className="text-muted-foreground">No invoices found. Create your first invoice to get started.</p>
+              <p className="text-muted-foreground">Keine Rechnungen gefunden. Erstellen Sie Ihre erste Rechnung, um zu beginnen.</p>
             </div>
           )}
         </CardContent>
@@ -479,16 +489,16 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
       <AlertDialog open={!!deleteInvoice} onOpenChange={() => setDeleteInvoice(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
+            <AlertDialogTitle>Rechnung löschen</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete invoice &quot;{deleteInvoice?.invoiceNumber}&quot;? This action cannot be undone.
+              Möchten Sie die Rechnung &quot;{deleteInvoice?.invoiceNumber}&quot; wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} disabled={deleting}>
               {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Delete
+              Löschen
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

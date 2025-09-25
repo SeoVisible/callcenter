@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select"
 
@@ -44,13 +44,13 @@ export function StatsSummary() {
           // Accept several possible column names returned by the server depending on metric:
           // - revenue (SUM)
           // - count / invoiceCount (COUNT)
-          monthlyRevenue: (json.monthlyRevenue || []).map((r: any) => ({
-            month: r.month,
-            revenue: Number(r.revenue ?? r.count ?? r.invoiceCount ?? r.value ?? 0),
+          monthlyRevenue: (json.monthlyRevenue || []).map((r: Record<string, unknown>) => ({
+            month: String(r.month),
+            revenue: Number((r.revenue ?? r.count ?? r.invoiceCount ?? r.value ?? 0) as unknown) || 0,
           })),
-          revenueByUser: (json.revenueByUser || []).map((r: any) => ({ id: r.id, name: r.name, invoiceCount: Number(r.invoiceCount || 0), revenue: Number(r.revenue || 0) })),
-          topProducts: (json.topProducts || []).map((r: any) => ({ id: r.id, name: r.name, quantity: Number(r.quantity || 0), revenue: Number(r.revenue || 0) })),
-          topClients: (json.topClients || []).map((r: any) => ({ id: r.id, name: r.name, invoiceCount: Number(r.invoiceCount || 0), revenue: Number(r.revenue || 0) })),
+          revenueByUser: (json.revenueByUser || []).map((r: Record<string, unknown>) => ({ id: String(r.id ?? ''), name: r.name as string | null, invoiceCount: Number(r.invoiceCount ?? 0), revenue: Number(r.revenue ?? 0) })),
+          topProducts: (json.topProducts || []).map((r: Record<string, unknown>) => ({ id: String(r.id ?? ''), name: String(r.name ?? ''), quantity: Number(r.quantity ?? 0), revenue: Number(r.revenue ?? 0) })),
+          topClients: (json.topClients || []).map((r: Record<string, unknown>) => ({ id: String(r.id ?? ''), name: String(r.name ?? ''), invoiceCount: Number(r.invoiceCount ?? 0), revenue: Number(r.revenue ?? 0) })),
         })
       } catch (err) {
         // ignore — leave data null
@@ -105,7 +105,7 @@ export function StatsSummary() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2 w-full max-w-md">
-          <Select onValueChange={(v) => setMonthsSelection(Number(v))}>
+          <Select onValueChange={(v: string) => setMonthsSelection(Number(v))}>
             <SelectTrigger size="sm">
               <SelectValue placeholder={`${monthsSelection} months`} />
             </SelectTrigger>
@@ -116,7 +116,7 @@ export function StatsSummary() {
             </SelectContent>
           </Select>
 
-          <Select onValueChange={(v) => setMetricSelection(v as any)}>
+          <Select onValueChange={(v: string) => setMetricSelection(v === 'invoices' ? 'invoices' : 'revenue')}>
             <SelectTrigger size="sm">
               <SelectValue placeholder={metricSelection === 'revenue' ? 'Revenue' : 'Invoices'} />
             </SelectTrigger>

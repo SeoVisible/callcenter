@@ -34,7 +34,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
 
   // Server-side validation: if lineItems provided, ensure unitPrice >= product.price for each submitted item
   if (data.lineItems) {
-    const productIds = Array.from(new Set(data.lineItems.map((li: any) => String(li.productId)).filter(Boolean))) as string[];
+  const productIds = Array.from(new Set((data.lineItems as Array<Record<string, unknown>>).map((li) => String((li as Record<string, unknown>).productId)).filter(Boolean))) as string[];
     if (productIds.length > 0) {
       const products = await prisma.product.findMany({ where: { id: { in: productIds } }, select: { id: true, price: true } });
       const priceById: Record<string, number> = {};

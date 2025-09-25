@@ -39,7 +39,7 @@ export function ClientList({ onAddClient, onEditClient }: ClientListProps) {
     try {
   const data = await clientService.getAllClients()
       setClients(data)
-    } catch (error) {
+    } catch {
       toast.error("Failed to load clients")
     } finally {
       setLoading(false)
@@ -104,11 +104,9 @@ export function ClientList({ onAddClient, onEditClient }: ClientListProps) {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle>Client Management</CardTitle>
+            <CardTitle>Kundenverwaltung</CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              {user?.role === "superadmin"
-                ? "Manage all clients in the system"
-                : "Manage your clients"}
+              {user?.role === "superadmin" ? "Verwalten Sie alle Kunden im System" : "Verwalten Sie Ihre Kunden"}
             </p>
           </div>
           <Button onClick={onAddClient}>
@@ -118,16 +116,16 @@ export function ClientList({ onAddClient, onEditClient }: ClientListProps) {
         </CardHeader>
         <CardContent>
           <div className="mb-4">
-            <Input placeholder="Search clients by name, company, email, phone or id..." value={query} onChange={(e) => setQuery(e.target.value)} />
+            <Input placeholder="Kunden nach Name, Firma, E-Mail, Telefon oder ID suchen..." value={query} onChange={(e) => setQuery(e.target.value)} />
           </div>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Client</TableHead>
-                <TableHead>Company</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+            <TableHead>Kunde</TableHead>
+            <TableHead>Firma</TableHead>
+            <TableHead>Kontakt</TableHead>
+            <TableHead>Ort</TableHead>
+            <TableHead className="text-right">Aktionen</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -192,34 +190,30 @@ export function ClientList({ onAddClient, onEditClient }: ClientListProps) {
               ))}
             </TableBody>
           </Table>
-          {clients.length === 0 && (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">
-                No clients found. Add your first client to get started.
-              </p>
-            </div>
-          )}
+            {clients.length === 0 && (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Keine Kunden gefunden. Fügen Sie Ihren ersten Kunden hinzu, um zu beginnen.</p>
+              </div>
+            )}
         </CardContent>
       </Card>
 
       <AlertDialog open={!!deleteClient} onOpenChange={() => setDeleteClient(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Client</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete &quot;{deleteClient?.name}&quot; from{" "}
-              {deleteClient?.company}&quot;? This action cannot be undone and will affect
-              any associated invoices.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} disabled={deleting}>
-              {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Kunden löschen</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Sind Sie sicher, dass Sie "{deleteClient?.name}" von "{deleteClient?.company}" löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden und betrifft alle zugehörigen Rechnungen.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete} disabled={deleting}>
+                  {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Löschen
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
       </AlertDialog>
     </>
   )

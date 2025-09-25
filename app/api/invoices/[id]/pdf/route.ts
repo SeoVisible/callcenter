@@ -1,18 +1,28 @@
 import { NextRequest } from "next/server"
 import { PrismaClient } from "@prisma/client"
-import PDFDocument from "pdfkit"
 import path from 'path'
 
 const prisma = new PrismaClient()
 
-function writeLine(doc: PDFDocument, text: string, x: number, yRef: { y: number }, options: any = {}) {
-  doc.text(text, x, yRef.y, options)
+// Helper was unused; keep implementation for future use but keep types safe (avoid `any`)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function writeLine(doc: unknown, text: string, x: number, yRef: { y: number }, options: Record<string, unknown> = {}) {
+  // Minimal runtime-safe call to text() if available
+  const d = doc as { text?: (...args: unknown[]) => void }
+  if (typeof d.text === 'function') d.text(text, x, yRef.y, options)
   // Advance reasonable amount — pdfkit manages line breaking; update y by height estimate
   yRef.y += 14
 }
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params
+export async function GET(request: NextRequest, context: { params: unknown }) {
+  // Next's generated types may provide `context.params` as a Promise in some
+  // build-time validation scenarios. Resolve it safely so the handler works
+  // with both `{ params: { id: string } }` and `{ params: Promise<{ id: string }> }`.
+  // context.params may be a Promise in some Next.js runtime checks; handle both cases
+  const rawParams = (context as unknown as { params?: unknown })?.params
+  const resolvedParams = rawParams && typeof (rawParams as Promise<unknown>).then === "function" ? await rawParams : rawParams
+  const id = (resolvedParams as unknown as { id?: string })?.id
+  if (!id) return new Response(JSON.stringify({ error: "Missing invoice id" }), { status: 400 })
   const url = new URL(request.url)
   const showPrices = url.searchParams.get("prices") !== "false" // default true
 
@@ -28,12 +38,43 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   const taxAmount = subtotal * (Number(invoice.taxRate) / 100)
   const total = subtotal + taxAmount
 
+  // Dynamically import pdfkit at runtime (server-only). This prevents the bundler
+  // from trying to resolve or include pdfkit during build time which can fail.
+  // Dynamically import pdfkit at runtime (server-only). Use `unknown` and a narrow constructor type
+  const pdfkitModule = (await import('pdfkit')) as unknown
+  type PDFDoc = {
+    on: (ev: string, cb: (...args: unknown[]) => void) => void
+    page: { width: number; }
+    image: (path: string, x: number, y: number, opts?: Record<string, unknown>) => void
+    font: (name: string) => PDFDoc
+    text: (...args: unknown[]) => PDFDoc
+    rect: (...args: unknown[]) => PDFDoc
+  fill: (...args: unknown[]) => PDFDoc
+    fillOpacity: (n: number) => PDFDoc
+    fillAndStroke: (...args: unknown[]) => PDFDoc
+    fillColor: (c: string) => PDFDoc
+    fontSize: (n: number) => PDFDoc
+    addPage: () => PDFDoc
+    save: () => PDFDoc
+    rotate: (n: number, opts?: Record<string, unknown>) => PDFDoc
+    restore: () => PDFDoc
+    moveDown: (n?: number) => PDFDoc
+    end: () => void
+    y?: number
+  }
+  type PDFDocumentConstructor = new (opts?: Record<string, unknown>) => PDFDoc
+  const pdfModuleObj = pdfkitModule as { default?: unknown } | unknown
+  const PDFDocument = (((pdfModuleObj as { default?: unknown }).default) ?? pdfModuleObj) as unknown as PDFDocumentConstructor
+
   // Create PDF in-memory and stream
   const doc = new PDFDocument({ size: 'A4', margin: 40 })
 
   // Prepare a stream to collect chunks
   const chunks: Buffer[] = []
-  doc.on('data', (chunk: Buffer | Uint8Array) => chunks.push(Buffer.from(chunk)))
+  doc.on('data', (...args: unknown[]) => {
+    const chunk = args[0] as Buffer | Uint8Array
+    chunks.push(Buffer.from(chunk))
+  })
   const endPromise = new Promise<Buffer>((resolve: (buf: Buffer) => void) => doc.on('end', () => resolve(Buffer.concat(chunks))))
 
   // Header
@@ -45,8 +86,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     const imgWidth = 320
     const imgX = Math.max(40, (pageWidth - imgWidth) / 2)
     doc.image(logoPath, imgX, 36, { width: imgWidth })
-  } catch (e) {
-    // ignore if missing
+  } catch {
+    // ignore if missing or invalid image
   }
 
   // Company block (top-right)
@@ -54,8 +95,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   // Company title and contact (German styling)
   doc.font('Helvetica-Bold').fontSize(16).fillColor('#c53030').text('Kompakt Arbeitsschutz', companyX, 40)
   doc.font('Helvetica').fontSize(9).fillColor('#374151')
-  doc.text('Berufsbekleidung von Kopf bis Fuß', companyX, doc.y + 2)
-  doc.text('Kompakt GmbH', companyX, doc.y + 6)
+  doc.text('Berufsbekleidung von Kopf bis Fuß', companyX, (doc.y ?? 0) + 2)
+  doc.text('Kompakt GmbH', companyX, (doc.y ?? 0) + 6)
   doc.text('Josef-Schregel-Str. 68, 52349 Düren', companyX)
   doc.text('Tel: 02421 / 95 90 176', companyX)
   doc.text('info@kompakt-arbeitsschutz.de', companyX)
@@ -67,14 +108,14 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   doc.fillOpacity(1)
   doc.font('Helvetica-Bold').fontSize(12).fillColor('#111827').text(`Rechnung ${invoice.id}`, metaX, metaY)
   doc.font('Helvetica').fontSize(9).fillColor('black')
-  doc.text(`Rechnungsdatum: ${new Date(invoice.createdAt).toLocaleDateString('de-DE')}`, metaX, doc.y + 4)
+  doc.text(`Rechnungsdatum: ${new Date(invoice.createdAt).toLocaleDateString('de-DE')}`, metaX, (doc.y ?? 0) + 4)
 
   // Bill To (left under logo)
   const billToY = 140
   doc.font('Helvetica-Bold').fontSize(11).fillColor('#111827').text('Rechnung an:', 40, billToY)
   doc.font('Helvetica').fontSize(10).fillColor('black')
   if (invoice.client) {
-    if (invoice.client.company) doc.text(invoice.client.company, 40, doc.y + 2)
+  if (invoice.client.company) doc.text(invoice.client.company, 40, (doc.y ?? 0) + 2)
     if (invoice.client.name) doc.text(invoice.client.name, 40)
     // invoice.client.address may be JSON; stringify safely
     try { if (invoice.client.address) doc.text(String(invoice.client.address), 40) } catch {}
@@ -83,7 +124,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
   // Table header
   const startX = 40
-  let yRef = { y: Math.max(doc.y + 12, billToY + 60) }
+  const yRef = { y: Math.max((doc.y ?? 0) + 12, billToY + 60) }
   const tableWidth = 515
   const colDescriptionWidth = 300
   const colQtyX = startX + colDescriptionWidth + 8

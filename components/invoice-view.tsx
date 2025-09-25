@@ -14,6 +14,11 @@ import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 import { toast } from "sonner"
 
+const toInvoiceStatus = (s: unknown) => {
+  const v = String(s)
+  return ["pending","maker","sent","paid","not_paid","completed"].includes(v) ? (v as Invoice["status"]) : undefined
+}
+
 interface InvoiceViewProps {
   invoice: Invoice
   onBack: () => void
@@ -154,9 +159,11 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
                       value={invoice.status}
                       open={statusSelectOpen}
                       onOpenChange={setStatusSelectOpen}
-                      onValueChange={async (value) => {
+          onValueChange={async (value: string) => {
                         try {
-                          await invoiceService.updateInvoice(invoice.id, { status: value as any })
+            // convert to known invoice status if possible
+            const statusValue = toInvoiceStatus(value) || (value as Invoice["status"])
+            await invoiceService.updateInvoice(invoice.id, { status: statusValue })
                           toast.success(`Status updated to ${value}`)
                           setStatusSelectOpen(false)
                           setTimeout(() => window.location.reload(), 250)

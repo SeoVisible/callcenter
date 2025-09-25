@@ -5,6 +5,11 @@ import jwt from "jsonwebtoken"
 const prisma = new PrismaClient()
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-key"
 
+interface JwtPayload {
+  id?: string
+  [key: string]: unknown
+}
+
 export async function GET() {
   const products = await prisma.product.findMany()
   return NextResponse.json(products)
@@ -15,11 +20,15 @@ async function getUserFromRequest(req: Request) {
   const token = cookie.split(";").find((c) => c.trim().startsWith("token="))?.split("=")[1]
   if (!token) return null
   try {
-    const payload: any = jwt.verify(token, JWT_SECRET)
-    const user = await prisma.user.findUnique({ where: { id: payload.id } })
+    const payload = jwt.verify(token, JWT_SECRET) as JwtPayload
+    const userId = typeof payload === 'object' && payload !== null && typeof payload.id === 'string' ? payload.id : undefined
+    if (!userId) return null
+    const user = await prisma.user.findUnique({ where: { id: userId } })
     if (!user) return null
-    const { password: _unused, ...userSafe } = user
-    return userSafe
+  // Omit password safely without creating an unused variable
+  const userCopy = { ...user }
+  delete (userCopy as Record<string, unknown>)['password']
+  return userCopy
   } catch {
     return null
   }

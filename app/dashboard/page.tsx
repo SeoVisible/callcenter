@@ -19,7 +19,7 @@ import type { User } from "@/lib/auth"
 import type { Product } from "@/lib/products"
 import type { Client } from "@/lib/clients"
 import type { Invoice } from "@/lib/invoices"
-import { Users, Package, FileText, UserCheck } from "lucide-react"
+// Icons imported previously but unused in this file were removed to satisfy lint
 
 export default function DashboardPage() {
   const { user } = useAuth()

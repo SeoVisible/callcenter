@@ -48,7 +48,7 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
         category: product.category,
         sku: product.sku,
         isGlobal: product.isGlobal,
-        stock: (product as any).stock?.toString() ?? "0",
+  stock: (product as unknown as Record<string, unknown>).stock ? String((product as unknown as Record<string, unknown>).stock) : "0",
       })
     } else {
       // Set default isGlobal based on user role
@@ -64,15 +64,15 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
     setError("")
     setLoading(true)
 
-    if (!user) {
-      setError("User not authenticated")
+      if (!user) {
+      setError("Benutzer nicht authentifiziert")
       setLoading(false)
       return
     }
 
     // Only superadmin may create global products; normal users are not allowed to create products in production
     if (!product && user.role !== "superadmin") {
-      setError("You do not have permission to create products")
+      setError("Sie haben keine Berechtigung, Produkte zu erstellen")
       setLoading(false)
       return
     }
@@ -80,7 +80,7 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
     try {
       const price = Number.parseFloat(formData.price)
       if (isNaN(price) || price < 0) {
-        setError("Please enter a valid price")
+        setError("Bitte geben Sie einen gültigen Preis ein")
         return
       }
 
@@ -95,8 +95,8 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
           sku: formData.sku,
         }
   await productService.updateProduct(product.id, updateData)
-        toast.success("Success", {
-          description: "Product updated successfully",
+        toast.success("Erfolg", {
+          description: "Produkt erfolgreich aktualisiert",
         })
       } else {
         // Create new product
@@ -111,8 +111,8 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
           isGlobal: formData.isGlobal,
         }
         await productService.createProduct(createData)
-        toast.success("Success", {
-          description: "Product created successfully",
+        toast.success("Erfolg", {
+          description: "Produkt erfolgreich erstellt",
         })
       }
       onSuccess()
@@ -125,45 +125,45 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center gap-4">
+        <CardHeader className="flex flex-row items-center gap-4">
         <Button variant="outline" size="icon" onClick={onCancel}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <CardTitle>{product ? "Edit Product" : "Add New Product"}</CardTitle>
+        <CardTitle>{product ? "Produkt bearbeiten" : "Neues Produkt hinzufügen"}</CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Product Name</Label>
+              <Label htmlFor="name">Produktname</Label>
               <Input
                 id="name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Enter product name"
+                placeholder="Produktname eingeben"
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="sku">SKU</Label>
+              <Label htmlFor="sku">Artikelnummer</Label>
               <Input
                 id="sku"
                 value={formData.sku}
                 onChange={(e) => setFormData({ ...formData, sku: e.target.value.toUpperCase() })}
-                placeholder="Enter SKU (e.g., PROD-001)"
+                placeholder="SKU eingeben (z.B., PROD-001)"
                 required
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description">Beschreibung</Label>
             <Textarea
               id="description"
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Enter product description"
+              placeholder="Produktbeschreibung eingeben"
               rows={3}
               required
             />
@@ -171,14 +171,14 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="category">Category</Label>
+              <Label htmlFor="category">Kategorie</Label>
               <Select
                 value={formData.category}
                 onValueChange={(value) => setFormData({ ...formData, category: value })}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Kategorie wählen" />
+                  </SelectTrigger>
                 <SelectContent>
                   {categories.map((category) => (
                     <SelectItem key={category} value={category}>
@@ -190,7 +190,7 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="price">Price ($)</Label>
+              <Label htmlFor="price">Preis (€)</Label>
               <Input
                 id="price"
                 type="number"
@@ -203,7 +203,7 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="stock">Stock</Label>
+              <Label htmlFor="stock">Lagerbestand</Label>
               <Input
                 id="stock"
                 type="number"
@@ -226,31 +226,31 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
                   onCheckedChange={(checked) => setFormData({ ...formData, isGlobal: !!checked })}
                 />
                 <Label htmlFor="isGlobal" className="text-sm font-medium">
-                  Make this a global product
+                  Als globales Produkt markieren
                 </Label>
               </div>
               <div className="flex items-start gap-2 p-3 bg-muted rounded-lg">
                 <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                 <div className="text-sm text-muted-foreground">
-                  <p className="font-medium mb-1">Product Scope:</p>
-                  <p>
-                    <strong>Global products</strong> are available to all users and can be used in any invoice.
-                  </p>
-                  <p>
-                    <strong>Personal products</strong> are only visible to you and linked to your clients.
-                  </p>
+                  <p className="font-medium mb-1">Produktumfang:</p>
+                    <p>
+                      <strong>Globale Produkte</strong> sind für alle Benutzer verfügbar und können in jeder Rechnung verwendet werden.
+                    </p>
+                    <p>
+                      <strong>Persönliche Produkte</strong> sind nur für Sie sichtbar und mit Ihren Kunden verknüpft.
+                    </p>
                 </div>
               </div>
             </div>
           )}
 
           {!product && user?.role === "user" && (
-            <div className="flex items-start gap-2 p-3 bg-muted rounded-lg">
-              <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-              <div className="text-sm text-muted-foreground">
-                <p>As a regular user, your products will be personal and only available for your clients.</p>
-              </div>
-            </div>
+                <div className="flex items-start gap-2 p-3 bg-muted rounded-lg">
+                  <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-muted-foreground">
+                    <p>Als regulärer Benutzer sind Ihre Produkte persönlich und nur für Ihre Kunden sichtbar.</p>
+                  </div>
+                </div>
           )}
 
           {error && (
@@ -262,10 +262,10 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
           <div className="flex gap-2">
             <Button type="submit" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {product ? "Update Product" : "Create Product"}
+              {product ? "Produkt aktualisieren" : "Produkt erstellen"}
             </Button>
             <Button type="button" variant="outline" onClick={onCancel}>
-              Cancel
+              Abbrechen
             </Button>
           </div>
         </form>

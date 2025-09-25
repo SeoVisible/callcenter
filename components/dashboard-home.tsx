@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { StatsSummary } from "@/components/stats-summary"
@@ -26,7 +26,7 @@ export function DashboardHome() {
     label: '',
     value: 0,
   })
-  const statusRef = useRef<HTMLDivElement | null>(null)
+  // statusRef was unused; removed to satisfy lint
 
   useEffect(() => {
     let cancelled = false
@@ -62,10 +62,10 @@ export function DashboardHome() {
 
         if (data.mock) {
           // Non-fatal informational message when using mock data
-          const msgs = data.errors && Array.isArray(data.errors) ? data.errors.map((e: any) => `${e.key}: ${e.message}`) : []
+          const msgs = data.errors && Array.isArray(data.errors) ? data.errors.map((e: { key: string; message: string }) => `${e.key}: ${e.message}`) : []
           if (!cancelled) setInfo(`Using mock data: ${msgs.join("; ")}`)
         } else if (data.errors && Array.isArray(data.errors) && data.errors.length > 0) {
-          const msgs = data.errors.map((e: any) => `${e.key}: ${e.message}`)
+          const msgs = data.errors.map((e: { key: string; message: string }) => `${e.key}: ${e.message}`)
           if (!cancelled) setInfo(`Partial errors: ${msgs.join("; ")}`)
         } else {
           if (!cancelled) setInfo(null)
@@ -140,10 +140,10 @@ export function DashboardHome() {
                     }
                     setStats(newStats)
                     if (data.mock) {
-                      const msgs = data.errors && Array.isArray(data.errors) ? data.errors.map((e: any) => `${e.key}: ${e.message}`) : []
+                      const msgs = data.errors && Array.isArray(data.errors) ? data.errors.map((e: { key: string; message: string }) => `${e.key}: ${e.message}`) : []
                       setInfo(`Using mock data: ${msgs.join("; ")}`)
                     } else if (data.errors && data.errors.length) {
-                      const msgs = data.errors.map((e: any) => `${e.key}: ${e.message}`)
+                      const msgs = data.errors.map((e: { key: string; message: string }) => `${e.key}: ${e.message}`)
                       setInfo(`Partial errors: ${msgs.join("; ")}`)
                     } else {
                       setInfo(null)
@@ -184,7 +184,7 @@ export function DashboardHome() {
 
   // Simple bar chart for invoices — expand to all statuses
   const statusKeys = ['pending','maker','sent','paid','not_paid','completed'] as const
-  const invoiceStatusValues = statusKeys.map((k) => (invoicesByStatus as any)[k] ?? 0)
+  const invoiceStatusValues = statusKeys.map((k) => ((invoicesByStatus as Record<string, number | undefined>)[k] ?? 0))
   const invoiceMax = Math.max(...invoiceStatusValues, 1)
   const hasAnyInvoice = invoiceStatusValues.some((v) => v > 0)
 

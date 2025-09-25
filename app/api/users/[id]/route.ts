@@ -15,9 +15,11 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
       where: { id },
       data,
     });
-  const { password: _unused, ...userSafe } = user;
-    return NextResponse.json(userSafe);
-  } catch (error) {
-    return NextResponse.json({ error: "Failed to update user" }, { status: 500 });
+  // Omit password safely by copying and deleting the key
+  const userCopy = { ...user }
+  delete (userCopy as Record<string, unknown>)['password']
+  return NextResponse.json(userCopy)
+  } catch {
+    return NextResponse.json({ error: "Failed to update user" }, { status: 500 })
   }
 }

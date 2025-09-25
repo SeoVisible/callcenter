@@ -57,20 +57,21 @@ class ClientService {
       try {
         const data = await res.json()
         message = data?.error || message
-      } catch (e) {
+      } catch {
         try {
           const text = await res.text()
           if (text) message = text
-        } catch {}
+        } catch {
+          // ignore
+        }
       }
       // Helpful for debugging in browser console
-      // eslint-disable-next-line no-console
-      console.error("clientService.getAllClients error:", message)
+        console.debug("clientService.getAllClients error:", message)
       throw new Error(message)
     }
-    const json = await res.json()
+      const json = await res.json() 
     // eslint-disable-next-line no-console
-    console.debug("clientService.getAllClients: received", Array.isArray(json) ? json.length : typeof json)
+      console.debug("clientService.getAllClients: received", Array.isArray(json) ? json.length : typeof json) 
     return json
   }
 

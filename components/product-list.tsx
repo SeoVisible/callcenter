@@ -64,7 +64,7 @@ export function ProductList({ onAddProduct, onEditProduct }: ProductListProps) {
     return (
       p.name?.toLowerCase().includes(q) ||
       p.sku?.toLowerCase().includes(q) ||
-      String((p as any).stock ?? "").toLowerCase().includes(q) ||
+      String((p as unknown as Record<string, unknown>).stock ?? "").toLowerCase().includes(q) ||
       p.category?.toLowerCase().includes(q) ||
       p.id?.toLowerCase().includes(q)
     )
@@ -149,7 +149,7 @@ export function ProductList({ onAddProduct, onEditProduct }: ProductListProps) {
                     </div>
                   </TableCell>
                   <TableCell className="font-mono text-sm">{product.sku}</TableCell>
-                  <TableCell className="font-mono text-sm">{(product as any).stock ?? 0}</TableCell>
+                  <TableCell className="font-mono text-sm">{String((product as unknown as Record<string, unknown>).stock ?? 0)}</TableCell>
                   <TableCell>
                     <Badge variant="outline">{product.category}</Badge>
                   </TableCell>

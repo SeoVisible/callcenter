@@ -95,11 +95,14 @@ function SelectContent({
   }, [])
 
   // Helper: recursively extract text from React nodes
-  const nodeToString = (node: any): string => {
+  const nodeToString = (node: React.ReactNode): string => {
     if (node == null) return ""
     if (typeof node === "string" || typeof node === "number") return String(node)
     if (Array.isArray(node)) return node.map(nodeToString).join("")
-  if (React.isValidElement(node)) return nodeToString(((node.props as any) && (node.props as any).children) ?? "")
+    if (React.isValidElement(node)) {
+      const props = node.props as { children?: React.ReactNode }
+      return nodeToString(props.children ?? "")
+    }
     return ""
   }
 
@@ -109,10 +112,11 @@ function SelectContent({
     if (!React.isValidElement(child)) return true
     const el = child as React.ReactElement
 
-    // Try to read value and children from the element's props. This works whether the
-    // element is our SelectItem wrapper or already a Radix element.
-    const valueProp = (el.props as any)?.value
-    const content = (el.props as any)?.children
+    // Try to read value and children from the element's props. Use a
+    // generic props shape to avoid `any` while still being flexible.
+    const props = el.props as Record<string, unknown>
+    const valueProp = props["value"] as string | number | undefined
+    const content = props["children"] as React.ReactNode | undefined
     const labelText = nodeToString(content)
     const combined = `${valueProp ?? ""} ${labelText}`.toLowerCase()
 
@@ -126,9 +130,10 @@ function SelectContent({
   React.useEffect(() => {
     try {
       const total = React.Children.toArray(children).length
-      // eslint-disable-next-line no-console
       console.debug(`SelectContent: query="${query}", totalItems=${total}, filtered=${filteredChildren.length}`)
-    } catch (e) {}
+    } catch {
+      // ignore
+    }
   }, [query, children, filteredChildren.length])
 
   return (

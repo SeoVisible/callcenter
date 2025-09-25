@@ -12,12 +12,14 @@ export async function GET(req: Request) {
     return NextResponse.json({ user: null }, { status: 200 })
   }
   try {
-    const payload = jwt.verify(token, JWT_SECRET)
+    const payload = jwt.verify(token, JWT_SECRET) as { id?: string }
     // Optionally, fetch user from DB for fresh data
     const user = await prisma.user.findUnique({ where: { id: payload.id } })
     if (!user) return NextResponse.json({ user: null }, { status: 200 })
-  const { password: _unused, ...userSafe } = user
-  return NextResponse.json({ user: userSafe })
+  // Omit password safely by copying and deleting the key
+  const userCopy = { ...user }
+  delete (userCopy as Record<string, unknown>)['password']
+  return NextResponse.json({ user: userCopy })
   } catch {
     return NextResponse.json({ user: null }, { status: 200 })
   }

@@ -92,9 +92,9 @@ export async function GET(request: Request) {
     `
 
     // Normalize numeric-like values (BigInt, numeric strings) to JSON-friendly numbers/strings
-    const normalize = (rows: any[]) =>
+    const normalize = (rows: Record<string, unknown>[]) =>
       rows.map((r) => {
-        const out: any = { ...r }
+        const out: Record<string, unknown> = { ...r }
         Object.keys(out).forEach((k) => {
           const v = out[k]
           if (typeof v === 'bigint') {
@@ -111,13 +111,18 @@ export async function GET(request: Request) {
             }
           }
           // If the DB returned a Decimal-like object with toNumber()
-          if (v && typeof v === 'object' && typeof (v as any).toNumber === 'function') {
-            try {
-              out[k] = (v as any).toNumber()
-            } catch {
-              out[k] = String(v)
+          if (v && typeof v === 'object') {
+            // Some DB drivers return Decimal-like objects exposing a `toNumber()` method.
+            type NumericLike = { toNumber?: () => number }
+            const maybeToNumber = (v as NumericLike).toNumber
+            if (typeof maybeToNumber === 'function') {
+              try {
+                out[k] = maybeToNumber.call(v)
+              } catch {
+                out[k] = String(v)
+              }
+              return
             }
-            return
           }
         })
         return out
@@ -135,18 +140,28 @@ export async function GET(request: Request) {
 
     // Map SQL monthly rows to an object for quick lookup
     const monthlyMap: Record<string, number> = {}
-    monthly.forEach((r: any) => {
-      const key = r.month
-      let val: number = 0
-      if (typeof r.revenue === 'bigint') {
+    monthly.forEach((r: Record<string, unknown>) => {
+      const key = String(r.month)
+      let val = 0
+      const rev = r.revenue as unknown
+      if (typeof rev === 'bigint') {
         const maxSafe = BigInt(Number.MAX_SAFE_INTEGER)
-        val = r.revenue <= maxSafe && r.revenue >= -maxSafe ? Number(r.revenue) : Number(String(r.revenue))
-      } else if (typeof r.revenue === 'string') {
-        val = Number(r.revenue) || 0
-      } else if (typeof r.revenue === 'number') {
-        val = r.revenue
-      } else if (r.revenue && typeof r.revenue === 'object' && typeof r.revenue.toNumber === 'function') {
-        try { val = r.revenue.toNumber() } catch { val = Number(String(r.revenue)) || 0 }
+        val = rev <= maxSafe && rev >= -maxSafe ? Number(rev) : Number(String(rev))
+      } else if (typeof rev === 'string') {
+        val = Number(rev) || 0
+      } else if (typeof rev === 'number') {
+        val = rev
+      } else if (rev && typeof rev === 'object') {
+        // If this is a Decimal-like object exposing `toNumber()` use it.
+        type NumericLike = { toNumber?: () => number }
+        const maybeToNumber = (rev as NumericLike).toNumber
+        if (typeof maybeToNumber === 'function') {
+          try {
+            val = maybeToNumber.call(rev as NumericLike) as number
+          } catch {
+            val = Number(String(rev)) || 0
+          }
+        }
       }
       monthlyMap[key] = val
     })

@@ -86,7 +86,7 @@ export async function POST(req: Request) {
 
     // Server-side validation: ensure unitPrice for each line item is not below the product's listed price
     const productIds = Array.from(new Set(
-      data.lineItems.map((li: any) => String(li.productId)).filter(Boolean)
+      (data.lineItems as Array<Record<string, unknown>>).map((li) => String((li as Record<string, unknown>).productId)).filter(Boolean)
     )) as string[];
     if (productIds.length > 0) {
       const products = await prisma.product.findMany({ where: { id: { in: productIds } }, select: { id: true, price: true } });
