@@ -6,7 +6,8 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "postinstall": "node ./scripts/patch-swc-helpers.js || true"
   },
   "dependencies": {
     "@prisma/client": "^6.16.0",
