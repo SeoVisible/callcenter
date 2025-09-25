@@ -55,7 +55,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     // Update invoice status to 'sent'
     await prisma.invoice.update({
       where: { id },
-      data: { status: 'sent', sentAt: new Date() },
+      data: { status: 'sent' },
     })
 
     // Preview URL for dev
