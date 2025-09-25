@@ -32,7 +32,6 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
     category: "",
     sku: "",
     isGlobal: false,
-    stock: "0",
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -48,7 +47,6 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
         category: product.category,
         sku: product.sku,
         isGlobal: product.isGlobal,
-  stock: (product as unknown as Record<string, unknown>).stock ? String((product as unknown as Record<string, unknown>).stock) : "0",
       })
     } else {
       // Set default isGlobal based on user role
@@ -70,13 +68,6 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
       return
     }
 
-    // Only superadmin may create global products; normal users are not allowed to create products in production
-    if (!product && user.role !== "superadmin") {
-      setError("You do not have permission to create products")
-      setLoading(false)
-      return
-    }
-
     try {
       const price = Number.parseFloat(formData.price)
       if (isNaN(price) || price < 0) {
@@ -90,7 +81,6 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
           name: formData.name,
           description: formData.description,
           price,
-          stock: Number.parseInt(formData.stock || "0"),
           category: formData.category,
           sku: formData.sku,
         }
@@ -104,7 +94,6 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
           name: formData.name,
           description: formData.description,
           price,
-          stock: Number.parseInt(formData.stock || "0"),
           category: formData.category,
           sku: formData.sku,
           createdBy: user.id,
@@ -129,7 +118,7 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
         <Button variant="outline" size="icon" onClick={onCancel}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <CardTitle>{product ? "Edit Product" : "Add New Product"}</CardTitle>
+  <CardTitle>{product ? 'Edit Product' : 'Add New Product'}</CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -202,19 +191,6 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
                 required
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="stock">Stock</Label>
-              <Input
-                id="stock"
-                type="number"
-                step="1"
-                min="0"
-                value={formData.stock}
-                onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                placeholder="0"
-                required
-              />
-            </div>
           </div>
 
           {!product && user?.role === "superadmin" && (
@@ -262,7 +238,7 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
           <div className="flex gap-2">
             <Button type="submit" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {product ? "Update Product" : "Create Product"}
+              {product ? 'Update Product' : 'Create Product'}
             </Button>
             <Button type="button" variant="outline" onClick={onCancel}>
               Cancel
