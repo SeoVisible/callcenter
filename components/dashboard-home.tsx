@@ -109,7 +109,7 @@ export function DashboardHome() {
           <div className="flex items-start justify-between">
             <div className="text-sm text-red-700">
               <strong>Could not load statistics.</strong>
-              <div className="text-xs text-red-600 mt-1">{error || "Failed to load stats"}</div>
+              <div className="text-xs text-red-600 mt-1">{error || 'Failed to load stats'}</div>
             </div>
             <div>
               <Button
@@ -171,7 +171,7 @@ export function DashboardHome() {
         </div>
 
         <div className="min-h-[300px] flex items-center justify-center">
-          <div className="text-sm text-muted-foreground">{error || "Failed to load stats"}</div>
+          <div className="text-sm text-muted-foreground">{error || 'Failed to load stats'}</div>
         </div>
       </div>
     )
