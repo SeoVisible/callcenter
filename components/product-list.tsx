@@ -5,6 +5,7 @@ import type { Product } from "@/lib/products"
 import { productService } from "@/lib/products"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -29,6 +30,8 @@ interface ProductListProps {
 export function ProductList({ onAddProduct, onEditProduct }: ProductListProps) {
   const { user } = useAuth()
   const [products, setProducts] = useState<Product[]>([])
+  const [query, setQuery] = useState("")
+  const [debouncedQuery, setDebouncedQuery] = useState("")
   const [loading, setLoading] = useState(true)
   const [deleteProduct, setDeleteProduct] = useState<Product | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -49,6 +52,23 @@ export function ProductList({ onAddProduct, onEditProduct }: ProductListProps) {
     }
     loadProducts()
   }, [user])
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query.trim().toLowerCase()), 250)
+    return () => clearTimeout(t)
+  }, [query])
+
+  const filteredProducts = products.filter((p) => {
+    if (!debouncedQuery) return true
+    const q = debouncedQuery
+    return (
+      p.name?.toLowerCase().includes(q) ||
+      p.sku?.toLowerCase().includes(q) ||
+      String((p as any).stock ?? "").toLowerCase().includes(q) ||
+      p.category?.toLowerCase().includes(q) ||
+      p.id?.toLowerCase().includes(q)
+    )
+  })
 
   const handleDelete = async () => {
     if (!deleteProduct || !user) return
@@ -104,6 +124,9 @@ export function ProductList({ onAddProduct, onEditProduct }: ProductListProps) {
           )}
         </CardHeader>
         <CardContent>
+          <div className="mb-4">
+            <Input placeholder="Search products by name, sku, stock, category or id..." value={query} onChange={(e) => setQuery(e.target.value)} />
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -117,7 +140,7 @@ export function ProductList({ onAddProduct, onEditProduct }: ProductListProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {products.map((product) => (
+              {filteredProducts.map((product) => (
                 <TableRow key={product.id}>
                   <TableCell>
                     <div>

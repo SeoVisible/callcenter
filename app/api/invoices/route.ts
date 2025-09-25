@@ -84,7 +84,24 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "At least one line item is required" }, { status: 400 });
     }
 
-    // Prepare lineItems for nested create
+    // Server-side validation: ensure unitPrice for each line item is not below the product's listed price
+    const productIds = Array.from(new Set(
+      data.lineItems.map((li: any) => String(li.productId)).filter(Boolean)
+    )) as string[];
+    if (productIds.length > 0) {
+      const products = await prisma.product.findMany({ where: { id: { in: productIds } }, select: { id: true, price: true } });
+      const priceById: Record<string, number> = {};
+      for (const p of products) priceById[p.id] = Number(p.price ?? 0);
+
+      for (const li of data.lineItems) {
+        const minPrice = priceById[String(li.productId)] ?? 0;
+        if (Number(li.unitPrice) < minPrice) {
+          return NextResponse.json({ error: `Line item for productId ${li.productId} has unitPrice ${li.unitPrice} which is below the product price ${minPrice}` }, { status: 400 });
+        }
+      }
+  }
+
+  // Prepare lineItems for nested create
     const lineItems = data.lineItems.map((item: { productId: string, productName: string, description: string, quantity: number, unitPrice: number }) => ({
       productId: item.productId,
       productName: item.productName,

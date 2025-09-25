@@ -68,8 +68,11 @@ model Invoice {
 
 enum InvoiceStatus {
     pending
+    maker
     sent
     paid
+    not_paid
+    completed
 }
 
 model InvoiceItem {

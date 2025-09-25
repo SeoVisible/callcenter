@@ -53,10 +53,25 @@ class ClientService {
   async getAllClients(): Promise<Client[]> {
     const res = await fetch("/api/clients")
     if (!res.ok) {
-      const data = await res.json()
-      throw new Error(data.error || "Failed to fetch clients")
+      let message = `Failed to fetch clients: ${res.status} ${res.statusText}`
+      try {
+        const data = await res.json()
+        message = data?.error || message
+      } catch (e) {
+        try {
+          const text = await res.text()
+          if (text) message = text
+        } catch {}
+      }
+      // Helpful for debugging in browser console
+      // eslint-disable-next-line no-console
+      console.error("clientService.getAllClients error:", message)
+      throw new Error(message)
     }
-    return res.json()
+    const json = await res.json()
+    // eslint-disable-next-line no-console
+    console.debug("clientService.getAllClients: received", Array.isArray(json) ? json.length : typeof json)
+    return json
   }
 
   async getClientById(id: string): Promise<Client | null> {

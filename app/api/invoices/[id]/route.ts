@@ -32,11 +32,27 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
   const { id } = await context.params
   const data = await request.json()
 
-  // Handle line items update: delete old, create new
+  // Server-side validation: if lineItems provided, ensure unitPrice >= product.price for each submitted item
   if (data.lineItems) {
+    const productIds = Array.from(new Set(data.lineItems.map((li: any) => String(li.productId)).filter(Boolean))) as string[];
+    if (productIds.length > 0) {
+      const products = await prisma.product.findMany({ where: { id: { in: productIds } }, select: { id: true, price: true } });
+      const priceById: Record<string, number> = {};
+      for (const p of products) priceById[p.id] = Number(p.price ?? 0);
+
+      for (const li of data.lineItems) {
+        const minPrice = priceById[String(li.productId)] ?? 0;
+        if (Number(li.unitPrice) < minPrice) {
+          return NextResponse.json({ error: `Line item for productId ${li.productId} has unitPrice ${li.unitPrice} which is below the product price ${minPrice}` }, { status: 400 });
+        }
+      }
+    }
+
+    // Handle line items update: delete old, create new
     // Remove all old line items
     await prisma.invoiceItem.deleteMany({ where: { invoiceId: id } })
   }
+
 
   // Update invoice fields (excluding lineItems)
   const updateData: Record<string, unknown> = { ...data }

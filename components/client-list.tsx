@@ -5,6 +5,7 @@ import type { Client } from "@/lib/clients"
 import { clientService } from "@/lib/clients"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
@@ -28,6 +29,8 @@ interface ClientListProps {
 export function ClientList({ onAddClient, onEditClient }: ClientListProps) {
   const { user } = useAuth()
   const [clients, setClients] = useState<Client[]>([])
+  const [query, setQuery] = useState("")
+  const [debouncedQuery, setDebouncedQuery] = useState("")
   const [loading, setLoading] = useState(true)
   const [deleteClient, setDeleteClient] = useState<Client | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -46,6 +49,23 @@ export function ClientList({ onAddClient, onEditClient }: ClientListProps) {
   useEffect(() => {
     loadClients()
   }, [user])
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query.trim().toLowerCase()), 250)
+    return () => clearTimeout(t)
+  }, [query])
+
+  const filteredClients = clients.filter((c) => {
+    if (!debouncedQuery) return true
+    const q = debouncedQuery
+    return (
+      c.name?.toLowerCase().includes(q) ||
+      c.company?.toLowerCase().includes(q) ||
+      c.email?.toLowerCase().includes(q) ||
+      c.phone?.toLowerCase().includes(q) ||
+      c.id?.toLowerCase().includes(q)
+    )
+  })
 
   const handleDelete = async () => {
     if (!deleteClient || !user) return
@@ -97,6 +117,9 @@ export function ClientList({ onAddClient, onEditClient }: ClientListProps) {
           </Button>
         </CardHeader>
         <CardContent>
+          <div className="mb-4">
+            <Input placeholder="Search clients by name, company, email, phone or id..." value={query} onChange={(e) => setQuery(e.target.value)} />
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -108,7 +131,7 @@ export function ClientList({ onAddClient, onEditClient }: ClientListProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {clients.map((client) => (
+              {filteredClients.map((client) => (
                 <TableRow
                   key={client.id}
                   className="cursor-pointer hover:bg-gray-100 dark:hover:bg-[var(--sidebar-item-hover)]"

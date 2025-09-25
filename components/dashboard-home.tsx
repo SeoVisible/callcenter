@@ -1,8 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { StatsSummary } from "@/components/stats-summary"
 
 interface Stats {
   users: number
@@ -18,6 +19,14 @@ export function DashboardHome() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
+  const [statusTooltip, setStatusTooltip] = useState<{ visible: boolean; x: number; y: number; label: string; value: number }>({
+    visible: false,
+    x: 0,
+    y: 0,
+    label: '',
+    value: 0,
+  })
+  const statusRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -173,9 +182,11 @@ export function DashboardHome() {
   // Debug: computed chart values
   console.debug("DashboardHome: invoicesByStatus:", invoicesByStatus)
 
-  // Simple bar chart for invoices
-  const invoiceStatusValues = [invoicesByStatus.pending, invoicesByStatus.sent, invoicesByStatus.paid]
+  // Simple bar chart for invoices — expand to all statuses
+  const statusKeys = ['pending','maker','sent','paid','not_paid','completed'] as const
+  const invoiceStatusValues = statusKeys.map((k) => (invoicesByStatus as any)[k] ?? 0)
   const invoiceMax = Math.max(...invoiceStatusValues, 1)
+  const hasAnyInvoice = invoiceStatusValues.some((v) => v > 0)
 
   console.debug("DashboardHome: invoiceStatusValues", invoiceStatusValues, "invoiceMax", invoiceMax)
 
@@ -190,7 +201,7 @@ export function DashboardHome() {
           <div className="text-sm text-yellow-800">{info}</div>
         </div>
       )}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader>
             <CardTitle>Users</CardTitle>
@@ -232,7 +243,10 @@ export function DashboardHome() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+  {/* New summary widget */}
+  <StatsSummary />
+
+  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
           <CardHeader>
             <CardTitle>Invoices by status</CardTitle>
@@ -240,18 +254,42 @@ export function DashboardHome() {
           <CardContent>
             <div className="mt-2 space-y-4">
               <div className="flex items-end gap-4 h-36">
-                {['pending','sent','paid'].map((k, i) => {
-                  const value = (invoiceStatusValues as any)[i]
+                {statusKeys.map((k, i) => {
+                  const value = invoiceStatusValues[i]
                   const height = Math.round((value / invoiceMax) * 100)
-                  return (
-                    <div key={k} className="flex flex-col items-center w-1/3">
-                      <div className="w-full bg-slate-100 rounded-b-md flex items-end" style={{ height: '100%' }}>
-                        <div className="bg-indigo-500 w-full rounded-t-md" style={{ height: `${height}%` }} />
-                      </div>
-                      <div className="text-sm mt-2 capitalize">{k} ({value})</div>
-                    </div>
-                  )
+                  // map status to color
+                  const colorClass = {
+                    pending: 'bg-gray-400',
+                    maker: 'bg-amber-400',
+                    sent: 'bg-sky-500',
+                    paid: 'bg-emerald-500',
+                    not_paid: 'bg-red-500',
+                    completed: 'bg-teal-500',
+                  }[k as string]
+                      const barHeight = hasAnyInvoice ? `${height}%` : '6px'
+                      const barColor = value > 0 ? colorClass : 'bg-slate-300'
+                          return (
+                            <div key={k} className="flex flex-col items-center w-1/6 h-full"
+                                onMouseMove={(e) => {
+                                  setStatusTooltip({ visible: true, x: e.clientX, y: e.clientY, label: k.replace('_', ' '), value })
+                                }}
+                              onMouseLeave={() => setStatusTooltip((t) => ({ ...t, visible: false }))}
+                            >
+                              <div className="w-full bg-slate-100 rounded-b-md flex flex-col justify-end h-full" style={{ height: '100%' }}>
+                                <div className={`${barColor} w-full rounded-t-md`} style={{ height: barHeight, minHeight: hasAnyInvoice ? undefined : 6 }} />
+                              </div>
+                              <div className="text-sm mt-2 capitalize">{k.replace('_', ' ')} ({value})</div>
+                            </div>
+                          )
                 })}
+                        {statusTooltip.visible && (
+                          <div className="z-50" style={{ position: 'fixed', left: statusTooltip.x + 12, top: statusTooltip.y - 40 }}>
+                            <div className="bg-slate-800 text-white text-sm px-2 py-1 rounded shadow">
+                              <div className="font-medium">{statusTooltip.label}</div>
+                              <div>{statusTooltip.value}</div>
+                            </div>
+                          </div>
+                        )}
               </div>
             </div>
           </CardContent>

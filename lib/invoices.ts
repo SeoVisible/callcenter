@@ -18,7 +18,7 @@ export interface Invoice {
   clientName: string
   clientEmail: string
   clientCompany: string
-  status: "pending" | "sent" | "paid"
+  status: "pending" | "maker" | "sent" | "paid" | "not_paid" | "completed"
   issueDate: string
   dueDate: string
   lineItems: InvoiceLineItem[]

@@ -10,7 +10,7 @@ export async function GET() {
     products: null,
     clients: null,
     invoices: null,
-    invoicesByStatus: { pending: null, sent: null, paid: null },
+    invoicesByStatus: { pending: null, maker: null, sent: null, paid: null, not_paid: null, completed: null },
     productsByScope: { global: null, personal: null },
     errors: [] as Array<{ key: string; message: string }>,
   }
@@ -63,9 +63,12 @@ export async function GET() {
 
   // invoices by status
   try {
-    result.invoicesByStatus.pending = await prisma.invoice.count({ where: { status: "pending" } })
-    result.invoicesByStatus.sent = await prisma.invoice.count({ where: { status: "sent" } })
-    result.invoicesByStatus.paid = await prisma.invoice.count({ where: { status: "paid" } })
+  result.invoicesByStatus.pending = await prisma.invoice.count({ where: { status: "pending" } })
+  result.invoicesByStatus.maker = await prisma.invoice.count({ where: { status: "maker" } })
+  result.invoicesByStatus.sent = await prisma.invoice.count({ where: { status: "sent" } })
+  result.invoicesByStatus.paid = await prisma.invoice.count({ where: { status: "paid" } })
+  result.invoicesByStatus.not_paid = await prisma.invoice.count({ where: { status: "not_paid" } })
+  result.invoicesByStatus.completed = await prisma.invoice.count({ where: { status: "completed" } })
   } catch (err: unknown) {
     const message = err && typeof err === 'object' && 'message' in err ? (err as { message?: string }).message : String(err)
     errors.push({ key: "invoicesByStatus", message: message ?? "unknown error" })

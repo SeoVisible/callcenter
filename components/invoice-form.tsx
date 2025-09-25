@@ -38,11 +38,14 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
   const { user } = useAuth()
   const [clients, setClients] = useState<Client[]>([])
   const [products, setProducts] = useState<Product[]>([])
+  // Shipping will be added as a product line item. If no shipping product exists
+  // in the catalog we will insert a virtual 'Shipping' line item so it's always available.
   const [formData, setFormData] = useState({
     clientId: clientId || "",
     dueDate: "",
     taxRate: 8.5,
     notes: "",
+    status: "pending",
   })
   const [lineItems, setLineItems] = useState<LineItemForm[]>([])
   const [loading, setLoading] = useState(false)
@@ -60,6 +63,7 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
         dueDate: invoice.dueDate ? invoice.dueDate.split("T")[0] : "",
         taxRate: invoice.taxRate,
         notes: invoice.notes,
+        status: invoice.status || "pending",
       })
       setLineItems(
         invoice.lineItems.map((item) => ({
@@ -96,6 +100,11 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
         clientService.getAllClients(),
         productService.getAllProducts(),
       ])
+      // Debugging: log received counts
+      // eslint-disable-next-line no-console
+      console.debug("InvoiceForm.loadData: clients", Array.isArray(clientsData) ? clientsData.length : typeof clientsData)
+      // eslint-disable-next-line no-console
+      console.debug("InvoiceForm.loadData: products", Array.isArray(productsData) ? productsData.length : typeof productsData)
       setClients(clientsData)
       setProducts(productsData)
     } catch (error) {
@@ -105,17 +114,80 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
     }
   }
 
-  const addLineItem = () => {
+  // shipping products are regular products that either have category 'shipping' or include 'shipping' in the name
+  const shippingProducts = products.filter((p) => (p.category || "").toLowerCase() === "shipping" || p.name.toLowerCase().includes("shipping"))
+
+  const addShipping = () => {
+    // Prefer an explicit shipping product if present
+    const product = products.find((p) => (p.category || "").toLowerCase() === "shipping" || p.name.toLowerCase().includes("shipping"))
+    if (product) {
+      setLineItems([
+        ...lineItems,
+        {
+          productId: product.id,
+          productName: product.name,
+          description: product.description || "Shipping",
+          quantity: 1,
+          unitPrice: product.price,
+        },
+      ])
+      return
+    }
+
+    // No shipping product in catalog: insert a virtual shipping line item so user can always add shipping
     setLineItems([
       ...lineItems,
       {
-        productId: "",
-        productName: "",
-        description: "",
+        productId: "virtual-shipping",
+        productName: "Shipping",
+        description: "Shipping",
         quantity: 1,
         unitPrice: 0,
       },
     ])
+  }
+
+  const addLineItem = () => {
+    // Ensure a shipping line item exists as the first row. Prefer a catalog shipping product
+    const hasShipping = lineItems.some((li) => {
+      if (!li) return false
+      if (li.productId === "virtual-shipping") return true
+      const p = products.find((p) => p.id === li.productId)
+      return !!p && ((p.category || "").toLowerCase() === "shipping" || p.name.toLowerCase().includes("shipping"))
+    })
+
+    const newItems = [...lineItems]
+    if (!hasShipping) {
+      const product = products.find((p) => (p.category || "").toLowerCase() === "shipping" || p.name.toLowerCase().includes("shipping"))
+      if (product) {
+        newItems.unshift({
+          productId: product.id,
+          productName: product.name,
+          description: product.description || "Shipping",
+          quantity: 1,
+          unitPrice: product.price,
+        })
+      } else {
+        newItems.unshift({
+          productId: "virtual-shipping",
+          productName: "Shipping",
+          description: "Shipping",
+          quantity: 1,
+          unitPrice: 0,
+        })
+      }
+    }
+
+    // Add the new blank item after shipping (or at end if shipping already exists)
+    newItems.push({
+      productId: "",
+      productName: "",
+      description: "",
+      quantity: 1,
+      unitPrice: 0,
+    })
+
+    setLineItems(newItems)
   }
 
   const removeLineItem = (index: number) => {
@@ -130,8 +202,20 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
     if (field === "productId" && typeof value === "string") {
       const product = products.find((p) => p.id === value)
       if (product) {
-        updated[index].productName = product.name
+        // For shipping-type products, normalize the productName to 'Shipping'
+        const isShipping = ((product.category || "").toLowerCase() === "shipping") || product.name.toLowerCase().includes("shipping")
+        updated[index].productName = isShipping ? "Shipping" : product.name
         updated[index].description = product.description
+        updated[index].unitPrice = product.price
+      }
+    }
+
+    // Enforce minimum unit price based on selected product
+    if (field === "unitPrice" && typeof value === "number") {
+      const productId = updated[index].productId
+      const product = products.find((p) => p.id === productId)
+      if (product && value < product.price) {
+        // clamp to product price
         updated[index].unitPrice = product.price
       }
     }
@@ -188,10 +272,22 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
       }
 
       if (invoice) {
+        // Validate unit prices are not below the product's listed price
+        for (const item of lineItems) {
+          if (item.productId) {
+            const prod = products.find((p) => p.id === item.productId)
+            if (prod && item.unitPrice < prod.price) {
+              setError(`Unit price for "${item.productName}" cannot be lower than product price (${prod.price.toFixed(2)})`)
+              setLoading(false)
+              return
+            }
+          }
+        }
         // Update existing invoice
         const updateData: UpdateInvoiceData = {
           clientId: formData.clientId,
           dueDate: formData.dueDate,
+          status: (formData as any).status,
           lineItems: lineItems.map((item) => ({
             productId: item.productId,
             productName: item.productName,
@@ -207,6 +303,17 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
           description: "Invoice updated successfully",
         })
       } else {
+        // Validate unit prices for new invoice as well
+        for (const item of lineItems) {
+          if (item.productId) {
+            const prod = products.find((p) => p.id === item.productId)
+            if (prod && item.unitPrice < prod.price) {
+              setError(`Unit price for "${item.productName}" cannot be lower than product price (${prod.price.toFixed(2)})`)
+              setLoading(false)
+              return
+            }
+          }
+        }
         // Create new invoice
         const createData: CreateInvoiceData = {
           clientId: formData.clientId,
@@ -287,6 +394,27 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
                 required
               />
             </div>
+            {invoice && (
+              <div className="space-y-2">
+                <Label htmlFor="status">Status</Label>
+                <Select
+                  value={(formData as any).status}
+                  onValueChange={(value) => setFormData({ ...formData, status: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="maker">Maker</SelectItem>
+                    <SelectItem value="sent">Sent</SelectItem>
+                    <SelectItem value="paid">Paid</SelectItem>
+                    <SelectItem value="not_paid">Not Paid</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           {/* Line Items */}
@@ -298,6 +426,8 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
                 Add Item
               </Button>
             </div>
+
+            {/* Shipping is automatically inserted as the first line item when adding items */}
 
             {lineItems.length > 0 && (
               <Table>
@@ -315,21 +445,49 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
                   {lineItems.map((item, index) => (
                     <TableRow key={index}>
                       <TableCell>
-                        <Select
-                          value={item.productId}
-                          onValueChange={(value) => updateLineItem(index, "productId", value)}
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select product" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {products.map((product) => (
-                              <SelectItem key={product.id} value={product.id}>
-                                {product.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        {(() => {
+                          const p = products.find((p) => p.id === item.productId)
+                          const isShipping = item.productId === "virtual-shipping" || (!!p && (((p.category || "").toLowerCase() === "shipping") || p.name.toLowerCase().includes("shipping")))
+                          if (isShipping) {
+                            return (
+                              <div className="font-medium">Shipping</div>
+                            )
+                          }
+
+                          return (
+                            <Select
+                              value={item.productId}
+                              onValueChange={(value) => updateLineItem(index, "productId", value)}
+                            >
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Select product" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {/* Shipping options first (normalize label to 'Shipping') */}
+                                {products.filter(p => ((p.category||"").toLowerCase() === "shipping") || p.name.toLowerCase().includes("shipping")).map((product) => (
+                                  <SelectItem key={`ship-${product.id}`} value={product.id}>
+                                    <div className="flex items-center justify-between w-full">
+                                      <span>Shipping</span>
+                                      <span className="text-sm text-muted-foreground">${product.price.toFixed(2)}</span>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+
+                                {/* If no shipping product exists, allow a virtual shipping option */}
+                                {products.every(p => !(((p.category||"").toLowerCase() === "shipping") || p.name.toLowerCase().includes("shipping"))) && (
+                                  <SelectItem key="virtual-shipping" value="virtual-shipping">Shipping</SelectItem>
+                                )}
+
+                                {/* Then list remaining non-shipping products */}
+                                {products.filter(p => !(((p.category||"").toLowerCase() === "shipping") || p.name.toLowerCase().includes("shipping"))).map((product) => (
+                                  <SelectItem key={product.id} value={product.id}>
+                                    {product.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )
+                        })()}
                       </TableCell>
                       <TableCell>
                         <Input
@@ -351,7 +509,10 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
                         <Input
                           type="number"
                           step="0.01"
-                          min="0"
+                          min={(() => {
+                            const p = products.find((p) => p.id === item.productId)
+                            return p ? p.price : 0
+                          })()}
                           value={item.unitPrice}
                           onChange={(e) => updateLineItem(index, "unitPrice", Number.parseFloat(e.target.value) || 0)}
                           className="w-24"

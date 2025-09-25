@@ -5,6 +5,7 @@ import type { Invoice } from "@/lib/invoices"
 import { invoiceService } from "@/lib/invoices"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -18,7 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent } from "@/components/ui/dropdown-menu"
 import { Plus, Edit, Trash2, Loader2, MoreHorizontal, Send, Eye, CheckCircle } from "lucide-react"
 import { toast } from "sonner"
 
@@ -31,6 +32,8 @@ interface InvoiceListProps {
 export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: InvoiceListProps) {
   const { user } = useAuth()
   const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [query, setQuery] = useState("")
+  const [debouncedQuery, setDebouncedQuery] = useState("")
   const [loading, setLoading] = useState(true)
   const [deleteInvoice, setDeleteInvoice] = useState<Invoice | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -53,6 +56,24 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
   useEffect(() => {
     loadInvoices()
   }, [user])
+
+  // debounce the query to avoid frequent re-renders while typing
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query.trim().toLowerCase()), 250)
+    return () => clearTimeout(t)
+  }, [query])
+
+  const filteredInvoices = invoices.filter((inv) => {
+    if (!debouncedQuery) return true
+    const q = debouncedQuery
+    return (
+      inv.invoiceNumber?.toLowerCase()?.includes(q) ||
+      inv.clientName?.toLowerCase()?.includes(q) ||
+      inv.userName?.toLowerCase()?.includes(q) ||
+      inv.id?.toLowerCase()?.includes(q) ||
+      inv.status?.toLowerCase()?.includes(q)
+    )
+  })
 
   const handleDelete = async () => {
     if (!deleteInvoice || !user) return
@@ -114,14 +135,20 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
   const getStatusBadge = (status: Invoice["status"]) => {
     const variants = {
       pending: "secondary",
+      maker: "secondary",
       sent: "default",
       paid: "default",
+      not_paid: "destructive",
+      completed: "default",
     } as const
 
-    const colors = {
+    const colors: Record<string,string> = {
       pending: "bg-gray-100 text-gray-800",
+      maker: "bg-amber-100 text-amber-800",
       sent: "bg-blue-100 text-blue-800",
       paid: "bg-green-100 text-green-800",
+      not_paid: "bg-red-100 text-red-800",
+      completed: "bg-teal-100 text-teal-800",
     }
 
     if (!status) {
@@ -158,6 +185,13 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
           </Button>
         </CardHeader>
         <CardContent>
+          <div className="mb-4">
+            <Input
+              placeholder="Search invoices by number, client, user, id or status..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -172,7 +206,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
               </TableRow>
             </TableHeader>
             <TableBody>
-              {invoices.map((invoice) => (
+              {filteredInvoices.map((invoice) => (
                 <TableRow key={invoice.id}>
                   <TableCell>
                     <div className="font-mono text-sm">{invoice.id}</div>
@@ -238,84 +272,148 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
                             <Send className="mr-2 h-4 w-4" />
                             Email Invoice
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={async () => {
-                              const jsPDF = (await import('jspdf')).default;
-                              const autoTable = (await import('jspdf-autotable')).default;
-                              const doc = new jsPDF();
-                              // Header
-                              doc.setFontSize(22);
-                              doc.setTextColor(40, 40, 80);
-                              doc.text(`INVOICE`, 14, 18);
-                              doc.setFontSize(12);
-                              doc.setTextColor(100);
-                              doc.text(`invoice-${invoice.id}`, 14, 26);
-                              doc.setTextColor(0);
-                              doc.setFontSize(11);
-                              doc.text(`Status: ${invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}`, 150, 18, { align: "right" });
-                              doc.text(`Created: ${new Date(invoice.createdAt).toLocaleDateString()}`, 150, 26, { align: "right" });
-                              doc.text(`Due: ${new Date(invoice.dueDate).toLocaleDateString()}`, 150, 34, { align: "right" });
+                          {/* Single Download submenu: Client PDF (with prices) and Maker PDF (no prices) */}
+                          <DropdownMenuSub>
+                            <DropdownMenuSubTrigger>
+                              Download PDF
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuSubContent>
+                              <DropdownMenuItem onClick={async () => {
+                                // Client PDF (with prices) - trigger client-side generation and save
+                                const jsPDF = (await import('jspdf')).default;
+                                const autoTable = (await import('jspdf-autotable')).default;
+                                const doc = new jsPDF();
+                                // Header
+                                doc.setFontSize(22);
+                                doc.setTextColor(40, 40, 80);
+                                doc.text(`INVOICE`, 14, 18);
+                                doc.setFontSize(12);
+                                doc.setTextColor(100);
+                                doc.text(`invoice-${invoice.id}`, 14, 26);
+                                doc.setTextColor(0);
+                                doc.setFontSize(11);
+                                doc.text(`Status: ${invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}`, 150, 18, { align: "right" });
+                                doc.text(`Created: ${new Date(invoice.createdAt).toLocaleDateString()}`, 150, 26, { align: "right" });
+                                doc.text(`Due: ${new Date(invoice.dueDate).toLocaleDateString()}`, 150, 34, { align: "right" });
 
-                              // Bill To
-                              doc.setFontSize(13);
-                              doc.setTextColor(40, 40, 80);
-                              doc.text("Bill To:", 14, 42);
-                              doc.setFontSize(11);
-                              doc.setTextColor(0);
-                              doc.text(invoice.clientName, 14, 48);
-                              if (invoice.clientCompany) doc.text(invoice.clientCompany, 14, 54);
-                              if (invoice.clientEmail) doc.text(invoice.clientEmail, 14, 60);
+                                // Bill To
+                                doc.setFontSize(13);
+                                doc.setTextColor(40, 40, 80);
+                                doc.text("Bill To:", 14, 42);
+                                doc.setFontSize(11);
+                                doc.setTextColor(0);
+                                doc.text(invoice.clientName, 14, 48);
+                                if (invoice.clientCompany) doc.text(invoice.clientCompany, 14, 54);
+                                if (invoice.clientEmail) doc.text(invoice.clientEmail, 14, 60);
 
-                              // Table
-                              autoTable(doc, {
-                                startY: 70,
-                                head: [["Description", "Qty", "Unit Price", "Total"]],
-                                body: invoice.lineItems.map(item => [
-                                  item.productName + (item.description ? `\n${item.description}` : ""),
-                                  item.quantity,
-                                  `$${item.unitPrice.toFixed(2)}`,
-                                  `$${item.total.toFixed(2)}`
-                                ]),
-                                headStyles: { fillColor: [40, 40, 80], textColor: 255, fontStyle: 'bold' },
-                                bodyStyles: { fontSize: 10 },
-                                alternateRowStyles: { fillColor: [245, 245, 255] },
-                                styles: { cellPadding: 2 },
-                              });
+                                // Table (with prices)
+                                autoTable(doc, {
+                                  startY: 70,
+                                  head: [["Description", "Qty", "Unit Price", "Total"]],
+                                  body: invoice.lineItems.map(item => [
+                                    item.productName + (item.description ? `\n${item.description}` : ""),
+                                    item.quantity,
+                                    `$${item.unitPrice.toFixed(2)}`,
+                                    `$${item.total.toFixed(2)}`
+                                  ]),
+                                  headStyles: { fillColor: [40, 40, 80], textColor: 255, fontStyle: 'bold' },
+                                  bodyStyles: { fontSize: 10 },
+                                  alternateRowStyles: { fillColor: [245, 245, 255] },
+                                  styles: { cellPadding: 2 },
+                                });
 
-                              const finalY = ((doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY) || 100;
-                              // Totals
-                              doc.setFontSize(11);
-                              doc.setTextColor(40, 40, 80);
-                              doc.text(`Subtotal:`, 130, finalY + 10);
-                              doc.text(`$${invoice.subtotal.toFixed(2)}`, 180, finalY + 10, { align: "right" });
-                              doc.text(`Tax (${invoice.taxRate}%):`, 130, finalY + 18);
-                              doc.text(`$${invoice.taxAmount.toFixed(2)}`, 180, finalY + 18, { align: "right" });
-                              doc.setFont("helvetica", "bold");
-                              doc.setFontSize(13);
-                              doc.text(`Total:`, 130, finalY + 28);
-                              doc.text(`$${invoice.total.toFixed(2)}`, 180, finalY + 28, { align: "right" });
-                              doc.setFont("helvetica", "normal");
-                              doc.setFontSize(11);
-                              doc.setTextColor(0);
-
-                              // Notes
-                              if (invoice.notes) {
+                                const finalY = ((doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY) || 100;
+                                // Totals
                                 doc.setFontSize(11);
                                 doc.setTextColor(40, 40, 80);
-                                doc.text("Notes:", 14, finalY + 40);
-                                doc.setFontSize(10);
-                                doc.setTextColor(80);
-                                doc.text(invoice.notes, 14, finalY + 48, { maxWidth: 180 });
+                                doc.text(`Subtotal:`, 130, finalY + 10);
+                                doc.text(`$${invoice.subtotal.toFixed(2)}`, 180, finalY + 10, { align: "right" });
+                                doc.text(`Tax (${invoice.taxRate}%):`, 130, finalY + 18);
+                                doc.text(`$${invoice.taxAmount.toFixed(2)}`, 180, finalY + 18, { align: "right" });
+                                doc.setFont("helvetica", "bold");
+                                doc.setFontSize(13);
+                                doc.text(`Total:`, 130, finalY + 28);
+                                doc.text(`$${invoice.total.toFixed(2)}`, 180, finalY + 28, { align: "right" });
+                                doc.setFont("helvetica", "normal");
+                                doc.setFontSize(11);
                                 doc.setTextColor(0);
-                              }
 
-                              doc.save(`invoice-${invoice.id}.pdf`);
-                            }}
-                          >
-                            <Eye className="mr-2 h-4 w-4" />
-                            Download PDF
-                          </DropdownMenuItem>
-                          {canEditInvoice(invoice) && invoice.status === "pending" && (
+                                // Notes
+                                if (invoice.notes) {
+                                  doc.setFontSize(11);
+                                  doc.setTextColor(40, 40, 80);
+                                  doc.text("Notes:", 14, finalY + 40);
+                                  doc.setFontSize(10);
+                                  doc.setTextColor(80);
+                                  doc.text(invoice.notes, 14, finalY + 48, { maxWidth: 180 });
+                                  doc.setTextColor(0);
+                                }
+
+                                doc.save(`invoice-${invoice.id}.pdf`);
+                              }}>
+                                Client PDF (with prices)
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={async () => {
+                                // Maker PDF (no prices)
+                                const jsPDF = (await import('jspdf')).default;
+                                const autoTable = (await import('jspdf-autotable')).default;
+                                const doc = new jsPDF();
+                                // Header
+                                doc.setFontSize(22);
+                                doc.setTextColor(40, 40, 80);
+                                doc.text(`INVOICE`, 14, 18);
+                                doc.setFontSize(12);
+                                doc.setTextColor(100);
+                                doc.text(`invoice-${invoice.id}`, 14, 26);
+                                doc.setTextColor(0);
+                                doc.setFontSize(11);
+                                doc.text(`Status: ${invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}`, 150, 18, { align: "right" });
+                                doc.text(`Created: ${new Date(invoice.createdAt).toLocaleDateString()}`, 150, 26, { align: "right" });
+                                doc.text(`Due: ${new Date(invoice.dueDate).toLocaleDateString()}`, 150, 34, { align: "right" });
+
+                                // Bill To
+                                doc.setFontSize(13);
+                                doc.setTextColor(40, 40, 80);
+                                doc.text("Bill To:", 14, 42);
+                                doc.setFontSize(11);
+                                doc.setTextColor(0);
+                                doc.text(invoice.clientName, 14, 48);
+                                if (invoice.clientCompany) doc.text(invoice.clientCompany, 14, 54);
+                                if (invoice.clientEmail) doc.text(invoice.clientEmail, 14, 60);
+
+                                // Table (no prices)
+                                autoTable(doc, {
+                                  startY: 70,
+                                  head: [["Description", "Qty"]],
+                                  body: invoice.lineItems.map(item => [
+                                    item.productName + (item.description ? `\n${item.description}` : ""),
+                                    item.quantity
+                                  ]),
+                                  headStyles: { fillColor: [40, 40, 80], textColor: 255, fontStyle: 'bold' },
+                                  bodyStyles: { fontSize: 10 },
+                                  alternateRowStyles: { fillColor: [245, 245, 255] },
+                                  styles: { cellPadding: 2 },
+                                });
+
+                                // Notes
+                                const finalY = ((doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY) || 100;
+                                if (invoice.notes) {
+                                  doc.setFontSize(11);
+                                  doc.setTextColor(40, 40, 80);
+                                  doc.text("Notes:", 14, finalY + 20);
+                                  doc.setFontSize(10);
+                                  doc.setTextColor(80);
+                                  doc.text(invoice.notes, 14, finalY + 28, { maxWidth: 180 });
+                                  doc.setTextColor(0);
+                                }
+
+                                doc.save(`invoice-${invoice.id}-no-prices.pdf`);
+                              }}>
+                                Maker PDF (no prices)
+                              </DropdownMenuItem>
+                            </DropdownMenuSubContent>
+                          </DropdownMenuSub>
+                          {canEditInvoice(invoice) && (invoice.status === "pending" || invoice.status === "maker") && (
                             <DropdownMenuItem
                               onClick={() => handleSendInvoice(invoice)}
                               disabled={sendingId === invoice.id}
@@ -328,7 +426,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
                               Send Invoice
                             </DropdownMenuItem>
                           )}
-                          {canEditInvoice(invoice) && invoice.status === "sent" && (
+                          {canEditInvoice(invoice) && (invoice.status === "sent" || invoice.status === "not_paid") && (
                             <DropdownMenuItem
                               onClick={() => handleMarkAsPaid(invoice)}
                               disabled={markingPaidId === invoice.id}
@@ -347,6 +445,21 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
                               Delete
                             </DropdownMenuItem>
                           )}
+                          <div className="border-t my-1" />
+                          <div className="px-2 text-xs text-muted-foreground">Change status</div>
+                          {['pending','maker','sent','paid','not_paid','completed'].map((s) => (
+                            <DropdownMenuItem key={s} onClick={async () => {
+                              try {
+                                await invoiceService.updateInvoice(invoice.id, { status: s as any })
+                                toast.success(`Status updated to ${s}`)
+                                loadInvoices()
+                              } catch (err) {
+                                toast.error(err instanceof Error ? err.message : 'Failed to update status')
+                              }
+                            }}>
+                              {s.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                            </DropdownMenuItem>
+                          ))}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
