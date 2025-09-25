@@ -90,7 +90,7 @@ export function UserForm({ user, onSuccess, onCancel }: UserFormProps) {
         <Button variant="outline" size="icon" onClick={onCancel}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <CardTitle>{user ? "Edit User" : "Add New User"}</CardTitle>
+  <CardTitle>{user ? 'Edit User' : 'Add New User'}</CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">

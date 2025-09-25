@@ -143,7 +143,7 @@ export function ClientForm({ client, onSuccess, onCancel, onViewInvoice }: Clien
         <Button variant="outline" size="icon" onClick={onCancel}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <CardTitle>{client ? "Edit Client" : "Add New Client"}</CardTitle>
+  <CardTitle>{client ? 'Edit Client' : 'Add New Client'}</CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">

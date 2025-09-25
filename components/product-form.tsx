@@ -64,15 +64,15 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
     setError("")
     setLoading(true)
 
-      if (!user) {
-      setError("Benutzer nicht authentifiziert")
+    if (!user) {
+      setError("User not authenticated")
       setLoading(false)
       return
     }
 
     // Only superadmin may create global products; normal users are not allowed to create products in production
     if (!product && user.role !== "superadmin") {
-      setError("Sie haben keine Berechtigung, Produkte zu erstellen")
+      setError("You do not have permission to create products")
       setLoading(false)
       return
     }
@@ -80,7 +80,7 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
     try {
       const price = Number.parseFloat(formData.price)
       if (isNaN(price) || price < 0) {
-        setError("Bitte geben Sie einen gültigen Preis ein")
+        setError("Please enter a valid price")
         return
       }
 
@@ -95,8 +95,8 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
           sku: formData.sku,
         }
   await productService.updateProduct(product.id, updateData)
-        toast.success("Erfolg", {
-          description: "Produkt erfolgreich aktualisiert",
+        toast.success("Success", {
+          description: "Product updated successfully",
         })
       } else {
         // Create new product
@@ -111,8 +111,8 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
           isGlobal: formData.isGlobal,
         }
         await productService.createProduct(createData)
-        toast.success("Erfolg", {
-          description: "Produkt erfolgreich erstellt",
+        toast.success("Success", {
+          description: "Product created successfully",
         })
       }
       onSuccess()
@@ -125,45 +125,45 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
 
   return (
     <Card>
-        <CardHeader className="flex flex-row items-center gap-4">
+      <CardHeader className="flex flex-row items-center gap-4">
         <Button variant="outline" size="icon" onClick={onCancel}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <CardTitle>{product ? "Produkt bearbeiten" : "Neues Produkt hinzufügen"}</CardTitle>
+        <CardTitle>{product ? "Edit Product" : "Add New Product"}</CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Produktname</Label>
+              <Label htmlFor="name">Product Name</Label>
               <Input
                 id="name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Produktname eingeben"
+                placeholder="Enter product name"
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="sku">Artikelnummer</Label>
+              <Label htmlFor="sku">SKU</Label>
               <Input
                 id="sku"
                 value={formData.sku}
                 onChange={(e) => setFormData({ ...formData, sku: e.target.value.toUpperCase() })}
-                placeholder="SKU eingeben (z.B., PROD-001)"
+                placeholder="Enter SKU (e.g., PROD-001)"
                 required
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description">Beschreibung</Label>
+            <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Produktbeschreibung eingeben"
+              placeholder="Enter product description"
               rows={3}
               required
             />
@@ -171,14 +171,14 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="category">Kategorie</Label>
+              <Label htmlFor="category">Category</Label>
               <Select
                 value={formData.category}
                 onValueChange={(value) => setFormData({ ...formData, category: value })}
               >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Kategorie wählen" />
-                  </SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
                 <SelectContent>
                   {categories.map((category) => (
                     <SelectItem key={category} value={category}>
@@ -190,7 +190,7 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="price">Preis (€)</Label>
+              <Label htmlFor="price">Price ($)</Label>
               <Input
                 id="price"
                 type="number"
@@ -203,7 +203,7 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="stock">Lagerbestand</Label>
+              <Label htmlFor="stock">Stock</Label>
               <Input
                 id="stock"
                 type="number"
@@ -226,31 +226,31 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
                   onCheckedChange={(checked) => setFormData({ ...formData, isGlobal: !!checked })}
                 />
                 <Label htmlFor="isGlobal" className="text-sm font-medium">
-                  Als globales Produkt markieren
+                  Make this a global product
                 </Label>
               </div>
               <div className="flex items-start gap-2 p-3 bg-muted rounded-lg">
                 <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                 <div className="text-sm text-muted-foreground">
-                  <p className="font-medium mb-1">Produktumfang:</p>
-                    <p>
-                      <strong>Globale Produkte</strong> sind für alle Benutzer verfügbar und können in jeder Rechnung verwendet werden.
-                    </p>
-                    <p>
-                      <strong>Persönliche Produkte</strong> sind nur für Sie sichtbar und mit Ihren Kunden verknüpft.
-                    </p>
+                  <p className="font-medium mb-1">Product Scope:</p>
+                  <p>
+                    <strong>Global products</strong> are available to all users and can be used in any invoice.
+                  </p>
+                  <p>
+                    <strong>Personal products</strong> are only visible to you and linked to your clients.
+                  </p>
                 </div>
               </div>
             </div>
           )}
 
           {!product && user?.role === "user" && (
-                <div className="flex items-start gap-2 p-3 bg-muted rounded-lg">
-                  <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                  <div className="text-sm text-muted-foreground">
-                    <p>Als regulärer Benutzer sind Ihre Produkte persönlich und nur für Ihre Kunden sichtbar.</p>
-                  </div>
-                </div>
+            <div className="flex items-start gap-2 p-3 bg-muted rounded-lg">
+              <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-muted-foreground">
+                <p>As a regular user, your products will be personal and only available for your clients.</p>
+              </div>
+            </div>
           )}
 
           {error && (
@@ -262,10 +262,10 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
           <div className="flex gap-2">
             <Button type="submit" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {product ? "Produkt aktualisieren" : "Produkt erstellen"}
+              {product ? "Update Product" : "Create Product"}
             </Button>
             <Button type="button" variant="outline" onClick={onCancel}>
-              Abbrechen
+              Cancel
             </Button>
           </div>
         </form>
