@@ -218,7 +218,10 @@ export async function POST(req: Request) {
 
         // Update product stocks for existing products only
         for (const prodId of Object.keys(stockById)) {
-          await prismaTx.product.update({ where: { id: prodId }, data: { stock: stockById[prodId] } })
+          // Cast data to the expected Prisma update input type to avoid build-time
+          // errors if the generated client doesn't include the new `stock` field yet.
+          const updateData = { stock: stockById[prodId] } as Parameters<typeof prismaTx.product.update>[0]['data']
+          await prismaTx.product.update({ where: { id: prodId }, data: updateData })
         }
 
         return createdInvoice
