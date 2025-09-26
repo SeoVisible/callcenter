@@ -29,7 +29,11 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
     // Use current product prices for revenue/profit calculation per user's request.
     // Fallback to invoice item values if product is not found or prices are missing.
     const productPrice = Number(product?.price ?? it.unitPrice ?? 0)
-    const productBP = Number(product?.buyingPrice ?? it.buyingPrice ?? 0)
+  // `product` may come from an older generated Prisma client type that doesn't
+  // include `buyingPrice` yet; cast to a narrow local type to avoid `any`.
+  type ProductPartial = { buyingPrice?: number; price?: number }
+  const p = product as unknown as ProductPartial
+  const productBP = Number(p.buyingPrice ?? it.buyingPrice ?? 0)
     totalSold += qty
 
     const invoiceDate = it.invoice?.createdAt ? new Date(it.invoice.createdAt) : null
