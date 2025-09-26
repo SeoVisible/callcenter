@@ -245,7 +245,7 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
                       {getStatusBadge(invoice.status)}
                     </button>
 
-                    <Select
+                    {/* <Select
                       value={invoice.status}
                       open={statusSelectOpen}
                       onOpenChange={setStatusSelectOpen}
@@ -273,7 +273,7 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
                         <SelectItem value="not_paid">Not Paid</SelectItem>
                         <SelectItem value="completed">Completed</SelectItem>
                       </SelectContent>
-                    </Select>
+                    </Select> */}
                   </div>
                 </div>
               </CardTitle>
