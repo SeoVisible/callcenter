@@ -145,7 +145,7 @@ export async function POST(req: Request) {
     // Fetch current stocks for products involved
   const productIdsInInvoice = Array.from(new Set(lineItems.map((li: LineItemInput) => li.productId).filter(Boolean))) as string[];
   // fetch category so we can treat 'shipping' products as exempt from stock changes
-  const products = await prisma.product.findMany({ where: { id: { in: productIdsInInvoice as string[] } }, select: { id: true, stock: true, category: true, buyingPrice: true } });
+  const products = (await prisma.product.findMany({ where: { id: { in: productIdsInInvoice as string[] } }, select: ({ id: true, stock: true, category: true, buyingPrice: true } as any) })) as unknown as Array<{ id: string; stock?: number | null; category?: string | null; buyingPrice?: number | null }>;
     // Build a map only for non-shipping products that exist in the DB. Shipping products are exempt
     // from stock validation/updates, even if they exist in the catalog.
     const stockById: Record<string, number> = {}
