@@ -20,6 +20,7 @@ import { Loader2, ArrowLeft } from "lucide-react"
 import { toast } from "sonner"
 import { formatCurrency, DEFAULT_CURRENCY } from '@/lib/currency'
 import { invoiceService, type Invoice } from "@/lib/invoices"
+import { formatStatusLabel } from '@/lib/status'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 interface ClientFormProps {
@@ -85,7 +86,7 @@ export function ClientForm({ client, onSuccess, onCancel, onViewInvoice }: Clien
 
     try {
       if (client) {
-        // Update existing client
+  // Update existing client
         const updateData: UpdateClientData = {
           name: formData.name,
           email: formData.email,
@@ -95,7 +96,7 @@ export function ClientForm({ client, onSuccess, onCancel, onViewInvoice }: Clien
           notes: formData.notes,
         }
         await clientService.updateClient(client.id, updateData)
-        toast.success("Client updated successfully")
+        toast.success("Kunde erfolgreich aktualisiert")
       } else {
         // Create new client
         const createData: CreateClientData = {
@@ -111,15 +112,15 @@ export function ClientForm({ client, onSuccess, onCancel, onViewInvoice }: Clien
         console.log('Created client:', newClient)
         if (newClient && newClient.id) {
           setCreatedClient(newClient)
-          toast.success("Client created successfully")
+          toast.success("Kunde erfolgreich erstellt")
           // Do not call onSuccess yet; show invoice form
         } else {
-          setError("Failed to create client. Please try again.")
+          setError("Kunde konnte nicht erstellt werden. Bitte versuchen Sie es erneut.")
         }
       }
       onSuccess()
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Operation failed")
+  setError(err instanceof Error ? err.message : "Vorgang fehlgeschlagen")
     } finally {
       setLoading(false)
     }
@@ -144,36 +145,36 @@ export function ClientForm({ client, onSuccess, onCancel, onViewInvoice }: Clien
         <Button variant="outline" size="icon" onClick={onCancel}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-  <CardTitle>{client ? 'Edit Client' : 'Add New Client'}</CardTitle>
+  <CardTitle>{client ? 'Kunde bearbeiten' : 'Neuen Kunden hinzufügen'}</CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Basic Information */}
           <div className="space-y-4">
-            <h3 className="text-lg font-medium">Basic Information</h3>
+                <h3 className="text-lg font-medium">Allgemeine Informationen</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
+                    <Label htmlFor="name">Vollständiger Name</Label>
                 <Input
                   id="name"
                   value={formData.name}
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
                   }
-                  placeholder="Enter client's full name"
+                      placeholder="Vollständigen Namen des Kunden eingeben"
                   required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="company">Company</Label>
+                    <Label htmlFor="company">Unternehmen</Label>
                 <Input
                   id="company"
                   value={formData.company}
                   onChange={(e) =>
                     setFormData({ ...formData, company: e.target.value })
                   }
-                  placeholder="Enter company name"
+                      placeholder="Firmennamen eingeben"
                   required
                 />
               </div>
@@ -181,7 +182,7 @@ export function ClientForm({ client, onSuccess, onCancel, onViewInvoice }: Clien
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
+                    <Label htmlFor="email">E-Mail-Adresse</Label>
                 <Input
                   id="email"
                   type="email"
@@ -189,13 +190,13 @@ export function ClientForm({ client, onSuccess, onCancel, onViewInvoice }: Clien
                   onChange={(e) =>
                     setFormData({ ...formData, email: e.target.value })
                   }
-                  placeholder="Enter email address"
+                      placeholder="E-Mail-Adresse eingeben"
                   required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
+                    <Label htmlFor="phone">Telefonnummer</Label>
                 <Input
                   id="phone"
                   type="tel"
@@ -203,7 +204,7 @@ export function ClientForm({ client, onSuccess, onCancel, onViewInvoice }: Clien
                   onChange={(e) =>
                     setFormData({ ...formData, phone: e.target.value })
                   }
-                  placeholder="Enter phone number"
+                      placeholder="Telefonnummer eingeben"
                   required
                 />
               </div>
@@ -212,60 +213,60 @@ export function ClientForm({ client, onSuccess, onCancel, onViewInvoice }: Clien
 
           {/* Address Information */}
           <div className="space-y-4">
-            <h3 className="text-lg font-medium">Address Information</h3>
+                <h3 className="text-lg font-medium">Adressinformationen</h3>
             <div className="space-y-2">
-              <Label htmlFor="street">Street Address</Label>
+                  <Label htmlFor="street">Straße</Label>
               <Input
                 id="street"
                 value={formData.address.street}
                 onChange={(e) => handleAddressChange("street", e.target.value)}
-                placeholder="Enter street address"
+                    placeholder="Straße eingeben"
                 required
               />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="city">City</Label>
+                <Label htmlFor="city">Stadt</Label>
                 <Input
                   id="city"
                   value={formData.address.city}
                   onChange={(e) => handleAddressChange("city", e.target.value)}
-                  placeholder="Enter city"
+                  placeholder="Stadt eingeben"
                   required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="state">State/Province</Label>
+                <Label htmlFor="state">Bundesland/Region</Label>
                 <Input
                   id="state"
                   value={formData.address.state}
                   onChange={(e) => handleAddressChange("state", e.target.value)}
-                  placeholder="Enter state"
+                  placeholder="Bundesland/Region eingeben"
                   required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="zipCode">ZIP/Postal Code</Label>
+                <Label htmlFor="zipCode">Postleitzahl</Label>
                 <Input
                   id="zipCode"
                   value={formData.address.zipCode}
                   onChange={(e) => handleAddressChange("zipCode", e.target.value)}
-                  placeholder="Enter ZIP code"
+                  placeholder="Postleitzahl eingeben"
                   required
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="country">Country</Label>
+              <Label htmlFor="country">Land</Label>
               <Input
                 id="country"
                 value={formData.address.country}
                 onChange={(e) => handleAddressChange("country", e.target.value)}
-                placeholder="Enter country"
+                placeholder="Land eingeben"
                 required
               />
             </div>
@@ -274,16 +275,16 @@ export function ClientForm({ client, onSuccess, onCancel, onViewInvoice }: Clien
 
           {/* Additional Information */}
           <div className="space-y-4">
-            <h3 className="text-lg font-medium">Additional Information</h3>
+            <h3 className="text-lg font-medium">Weitere Informationen</h3>
             <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
+              <Label htmlFor="notes">Notizen</Label>
               <Textarea
                 id="notes"
                 value={formData.notes}
                 onChange={(e) =>
                   setFormData({ ...formData, notes: e.target.value })
                 }
-                placeholder="Enter any additional notes about this client"
+                placeholder="Geben Sie zusätzliche Notizen zu diesem Kunden ein"
                 rows={4}
               />
             </div>
@@ -301,10 +302,10 @@ export function ClientForm({ client, onSuccess, onCancel, onViewInvoice }: Clien
               <>
                 <Button type="submit" disabled={loading}>
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {client ? "Update Client" : "Create Client"}
+                  {client ? "Kunde aktualisieren" : "Kunde erstellen"}
                 </Button>
                 <Button type="button" variant="outline" onClick={onCancel}>
-                  Cancel
+                  Abbrechen
                 </Button>
               </>
             ) : null}
@@ -313,7 +314,7 @@ export function ClientForm({ client, onSuccess, onCancel, onViewInvoice }: Clien
           {/* Show InvoiceForm after client is created */}
           {createdClient && (
             <div className="mt-8">
-              <h3 className="text-lg font-semibold mb-2">Create First Invoice for This Client</h3>
+              <h3 className="text-lg font-semibold mb-2">Erste Rechnung für diesen Kunden erstellen</h3>
               <InvoiceForm
                 clientId={createdClient.id}
                 onSuccess={onSuccess}
@@ -325,14 +326,14 @@ export function ClientForm({ client, onSuccess, onCancel, onViewInvoice }: Clien
         {/* Show related invoices if editing/viewing a client */}
         {client && clientInvoices.length > 0 && (
           <div className="mt-8">
-            <h3 className="text-lg font-semibold mb-2">Invoices for this Client</h3>
+            <h3 className="text-lg font-semibold mb-2">Rechnungen für diesen Kunden</h3>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Invoice #</TableHead>
+                  <TableHead>Rechnung #</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  <TableHead>Total</TableHead>
+                  <TableHead>Fälligkeitsdatum</TableHead>
+                  <TableHead>Gesamt</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -343,7 +344,7 @@ export function ClientForm({ client, onSuccess, onCancel, onViewInvoice }: Clien
                     onClick={() => onViewInvoice && onViewInvoice(inv)}
                   >
                     <TableCell>{inv.invoiceNumber || inv.id.slice(0, 8)}</TableCell>
-                    <TableCell>{inv.status}</TableCell>
+                    <TableCell>{formatStatusLabel(inv.status)}</TableCell>
                     <TableCell>{new Date(inv.dueDate).toLocaleDateString()}</TableCell>
                     <TableCell>{formatCurrency(inv.total ?? 0, DEFAULT_CURRENCY)}</TableCell>
                   </TableRow>

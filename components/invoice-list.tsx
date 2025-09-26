@@ -72,8 +72,8 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
       setInvoices(data)
     } catch {
       // Log to console to aid debugging in dev. The UI shows a toast too.
-      console.error("InvoiceList: failed to load invoices")
-      toast.error("Failed to load invoices")
+  console.error("InvoiceList: failed to load invoices")
+  toast.error("Fehler beim Laden der Rechnungen")
     } finally {
       setLoading(false)
       setTableLoading(false)
@@ -130,7 +130,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
   const data = await invoiceService.getAllInvoices(user?.id, user?.role, statusParam, undefined, undefined, clientParam, userParam)
       setInvoices(data)
     } catch {
-      toast.error('Failed to apply filters')
+      toast.error('Filter konnten nicht angewendet werden')
     } finally {
       setTableLoading(false)
     }
@@ -160,10 +160,10 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
     setDeleting(true)
     try {
   await invoiceService.deleteInvoice(deleteInvoice.id)
-      setInvoices(invoices.filter((inv) => inv.id !== deleteInvoice.id))
-      toast.success("Invoice deleted successfully")
+  setInvoices(invoices.filter((inv) => inv.id !== deleteInvoice.id))
+  toast.success("Rechnung erfolgreich gelöscht")
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to delete invoice")
+      toast.error(error instanceof Error ? error.message : "Fehler beim Löschen der Rechnung")
     } finally {
       setDeleting(false)
       setDeleteInvoice(null)
@@ -177,10 +177,10 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
     try {
   const result = await invoiceService.sendInvoice(invoice.id)
   // Optionally, show previewUrl or refetch invoices
-  toast.success("Invoice sent!", { description: result.previewUrl ? `Preview: ${result.previewUrl}` : undefined })
+  toast.success("Rechnung gesendet!", { description: result.previewUrl ? `Vorschau: ${result.previewUrl}` : undefined })
   // Optionally, reload invoices to update status
   void loadInvoices()
-      toast.success(`Invoice sent to ${invoice.clientEmail}`)
+    toast.success(`Rechnung gesendet an ${invoice.clientEmail}`)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to send invoice")
     } finally {
@@ -194,7 +194,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
     setMarkingPaidId(invoice.id)
     try {
   // Mark as paid not implemented in service. You may want to implement it in the API and service.
-  toast.info("Mark as paid is not implemented.")
+  toast.info("Als bezahlt markieren ist nicht implementiert.")
       toast.success("Invoice marked as paid")
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to update invoice")
@@ -249,40 +249,40 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle>Invoice Management</CardTitle>
+            <CardTitle>Rechnungsverwaltung</CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              {user?.role === "superadmin" ? "Manage all invoices in the system" : "Manage your invoices"}
+              {user?.role === "superadmin" ? "Verwalten Sie alle Rechnungen im System" : "Verwalten Sie Ihre Rechnungen"}
             </p>
           </div>
           <div className="flex items-center gap-2">
             {loading ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : null}
             <Button onClick={onAddInvoice} disabled={loading}>
             <Plus className="mr-2 h-4 w-4" />
-            Create Invoice
+            Rechnung erstellen
             </Button>
           </div>
         </CardHeader>
         <CardContent>
           <div className="mb-4 flex items-center gap-2">
             <Input
-              placeholder="Search invoices by number, client, user, id or status..."
+              placeholder="Rechnungen nach Nummer, Kunde, Benutzer, ID oder Status durchsuchen..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
             <div className="w-48">
               <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as InvoiceStatus | "")} className="w-full rounded-lg border px-3 py-2">
-                <option value="">All statuses</option>
-                <option value="pending">Pending</option>
-                <option value="maker">Maker</option>
-                <option value="sent">Sent</option>
-                <option value="paid">Paid</option>
-                <option value="not_paid">Not Paid</option>
-                <option value="completed">Completed</option>
+                <option value="">Alle Stati</option>
+                <option value="pending">Ausstehend</option>
+                <option value="maker">In Bearbeitung</option>
+                <option value="sent">Versendet</option>
+                <option value="paid">Bezahlt</option>
+                <option value="not_paid">Nicht bezahlt</option>
+                <option value="completed">Abgeschlossen</option>
               </select>
             </div>
             <div className="w-48">
               <select value={filterClient} onChange={(e) => setFilterClient(e.target.value)} className="w-full rounded-lg border px-3 py-2">
-                <option value="">All clients</option>
+                <option value="">Alle Kunden</option>
                 {clients.map(c => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
@@ -290,7 +290,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
             </div>
             <div className="w-48">
               <select value={filterUser} onChange={(e) => setFilterUser(e.target.value)} className="w-full rounded-lg border px-3 py-2">
-                <option value="">All users</option>
+                <option value="">Alle Benutzer</option>
                 {users.map(u => (
                   <option key={u.id} value={u.id}>{u.name}</option>
                 ))}
@@ -301,14 +301,14 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
             <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Invoice #</TableHead>
-                <TableHead>Client</TableHead>
-                <TableHead>User</TableHead>
-                <TableHead>Amount</TableHead>
+                <TableHead>Rechnung #</TableHead>
+                <TableHead>Kunde</TableHead>
+                <TableHead>Benutzer</TableHead>
+                <TableHead>Betrag</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Invoice Date</TableHead>
-                <TableHead>Due Date</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>Rechnungsdatum</TableHead>
+                <TableHead>Fälligkeitsdatum</TableHead>
+                <TableHead className="text-right">Aktionen</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -365,7 +365,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
                           {canEditInvoice(invoice) && (
                             <DropdownMenuItem onClick={() => onEditInvoice(invoice)}>
                               <Edit className="mr-2 h-4 w-4" />
-                              Edit
+                              Bearbeiten
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuItem
@@ -375,28 +375,28 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
                                 const result = await invoiceService.sendInvoice(invoice.id)
                                 setSendingId(null)
                                 if (result.previewUrl) {
-                                  toast.success('Invoice email sent! (Preview)', {
+                                  toast.success('Rechnungs-E-Mail gesendet! (Vorschau)', {
                                     description: (
-                                      <a href={result.previewUrl} target="_blank" rel="noopener noreferrer" className="underline text-blue-600">View Email</a>
+                                      <a href={result.previewUrl} target="_blank" rel="noopener noreferrer" className="underline text-blue-600">E-Mail anzeigen</a>
                                     )
                                   })
                                 } else {
-                                  toast.success('Invoice email sent!')
+                                  toast.success('Rechnungs-E-Mail gesendet!')
                                 }
                               } catch (error) {
                                 setSendingId(null)
-                                toast.error(error instanceof Error ? error.message : 'Failed to send invoice email')
+                                toast.error(error instanceof Error ? error.message : 'Fehler beim Senden der Rechnungs-E-Mail')
                               }
                             }}
                             disabled={sendingId === invoice.id}
                           >
                             <Send className="mr-2 h-4 w-4" />
-                            Email Invoice
+                            Rechnung per E-Mail
                           </DropdownMenuItem>
                           {/* Single Download submenu: Client PDF (with prices) and Maker PDF (no prices) */}
                           <DropdownMenuSub>
                             <DropdownMenuSubTrigger>
-                              Download PDF
+                              PDF herunterladen
                             </DropdownMenuSubTrigger>
                             <DropdownMenuSubContent>
                               <DropdownMenuItem onClick={async () => {
@@ -407,7 +407,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
                                 // Header
                                 doc.setFontSize(22);
                                 doc.setTextColor(40, 40, 80);
-                                doc.text(`INVOICE`, 14, 18);
+                                doc.text(`RECHNUNG`, 14, 18);
                                 doc.setFontSize(12);
                                 doc.setTextColor(100);
                                 doc.text(`invoice-${invoice.id}`, 14, 26);
@@ -420,7 +420,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
                                 // Bill To
                                 doc.setFontSize(13);
                                 doc.setTextColor(40, 40, 80);
-                                doc.text("Bill To:", 14, 42);
+                                doc.text("Rechnung an:", 14, 42);
                                 doc.setFontSize(11);
                                 doc.setTextColor(0);
                                 doc.text(invoice.clientName, 14, 48);
@@ -472,7 +472,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
 
                                 doc.save(`invoice-${invoice.id}.pdf`);
                               }}>
-                                Client PDF (with prices)
+                                Kunden-PDF (mit Preisen)
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={async () => {
                                 // Maker PDF (no prices)
@@ -482,7 +482,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
                                 // Header
                                 doc.setFontSize(22);
                                 doc.setTextColor(40, 40, 80);
-                                doc.text(`INVOICE`, 14, 18);
+                                doc.text(`RECHNUNG`, 14, 18);
                                 doc.setFontSize(12);
                                 doc.setTextColor(100);
                                 doc.text(`invoice-${invoice.id}`, 14, 26);
@@ -495,7 +495,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
                                 // Bill To
                                 doc.setFontSize(13);
                                 doc.setTextColor(40, 40, 80);
-                                doc.text("Bill To:", 14, 42);
+                                doc.text("Rechnung an:", 14, 42);
                                 doc.setFontSize(11);
                                 doc.setTextColor(0);
                                 doc.text(invoice.clientName, 14, 48);
@@ -530,7 +530,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
 
                                 doc.save(`invoice-${invoice.id}-no-prices.pdf`);
                               }}>
-                                Maker PDF (no prices)
+                                Interne-PDF (ohne Preise)
                               </DropdownMenuItem>
                             </DropdownMenuSubContent>
                           </DropdownMenuSub>
@@ -544,7 +544,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
                               ) : (
                                 <Send className="mr-2 h-4 w-4" />
                               )}
-                              Send Invoice
+                              Rechnung senden
                             </DropdownMenuItem>
                           )}
                           {canEditInvoice(invoice) && (invoice.status === "sent" || invoice.status === "not_paid") && (
@@ -557,17 +557,17 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
                               ) : (
                                 <CheckCircle className="mr-2 h-4 w-4" />
                               )}
-                              Mark as Paid
+                              Als bezahlt markieren
                             </DropdownMenuItem>
                           )}
                           {canDeleteInvoice(invoice) && (
                             <DropdownMenuItem onClick={() => setDeleteInvoice(invoice)} className="text-destructive">
                               <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
+                              Löschen
                             </DropdownMenuItem>
                           )}
                           <div className="border-t my-1" />
-                          <div className="px-2 text-xs text-muted-foreground">Change status</div>
+                          <div className="px-2 text-xs text-muted-foreground">Status ändern</div>
                           {['pending','maker','sent','paid','not_paid','completed'].map((s) => (
                             <DropdownMenuItem key={s} onClick={async () => {
                               const newStatus = toInvoiceStatus(s)
@@ -578,16 +578,16 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
                                 setInvoices(prev.map(i => i.id === invoice.id ? { ...i, status: newStatus } : i))
                                 setUpdatingStatusId(invoice.id)
                                 await invoiceService.updateInvoice(invoice.id, { status: newStatus })
-                                toast.success(`Status updated to ${s}`)
+                                toast.success(`Status geändert zu ${formatStatusLabel(s)}`)
                               } catch (err) {
                                 // revert
                                 setInvoices(prev)
-                                toast.error(err instanceof Error ? err.message : 'Failed to update status')
+                                toast.error(err instanceof Error ? err.message : 'Fehler beim Aktualisieren des Status')
                               } finally {
                                 setUpdatingStatusId(null)
                               }
                             }}>
-                              {s.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                              {formatStatusLabel(s)}
                             </DropdownMenuItem>
                           ))}
                         </DropdownMenuContent>
@@ -601,8 +601,8 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
           </Table>
           {invoices.length === 0 && (
             <div className="text-center py-8">
-              <p className="text-muted-foreground">No invoices found. Create your first invoice to get started.</p>
-            </div>
+                <p className="text-muted-foreground">Keine Rechnungen gefunden. Erstellen Sie Ihre erste Rechnung, um zu beginnen.</p>
+              </div>
           )}
         </CardContent>
       </Card>
@@ -610,16 +610,16 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
       <AlertDialog open={!!deleteInvoice} onOpenChange={() => setDeleteInvoice(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
+            <AlertDialogTitle>Rechnung löschen</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete invoice &quot;{deleteInvoice?.invoiceNumber}&quot;? This action cannot be undone.
+              Sind Sie sicher, dass Sie die Rechnung &quot;{deleteInvoice?.invoiceNumber}&quot; löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} disabled={deleting}>
               {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Delete
+              Löschen
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

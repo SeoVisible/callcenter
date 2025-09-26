@@ -41,7 +41,7 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
       completed: "bg-teal-100 text-teal-800",
     }
 
-    const label = typeof status === 'string' ? formatStatusLabel(status) : 'Unknown'
+  const label = typeof status === 'string' ? formatStatusLabel(status) : 'Unbekannt'
     return <Badge className={colors[status] ?? 'bg-gray-100 text-gray-800'}>{label}</Badge>
   }
 
@@ -49,8 +49,8 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
     const { showPrices } = opts;
     const doc = new jsPDF({ unit: 'pt', format: 'a4' });
 
-    // Try to load a logo from /nifar_logo.jpg (public) using fetch->blob->dataURL
-    // This is more reliable than Image + canvas for local dev and avoids CORS issues.
+  // Try to load a logo from /nifar_logo.jpg (public) using fetch->blob->dataURL
+  // This is more reliable than Image + canvas for local dev and avoids CORS issues.
     let logoDataUrl: string | null = null
     try {
       const resp = await fetch('/nifar_logo.jpg')
@@ -66,20 +66,20 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
       logoDataUrl = null
     }
 
-    // Header: logo left, company info right
+  // Header: logo left, company info right
     const leftX = 40
     const rightX = 420
     const yBase = 40
-    if (logoDataUrl) {
+      if (logoDataUrl) {
       try {
         doc.addImage(logoDataUrl, 'PNG', leftX, yBase - 8, 120, 40)
       } catch (e) {
         doc.setFontSize(18)
-        doc.text('Company', leftX, yBase + 12)
+        doc.text('Firma', leftX, yBase + 12)
       }
     } else {
       doc.setFontSize(18)
-      doc.text('Company', leftX, yBase + 12)
+      doc.text('Firma', leftX, yBase + 12)
     }
 
     doc.setFontSize(10)
@@ -102,7 +102,7 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
   const idLines = typeof (doc as any).splitTextToSize === 'function' ? (doc as any).splitTextToSize(idText, idMaxWidth) : [idText]
   doc.text(idLines, rightX, yBase + 70)
 
-    // Client (left) and Invoice meta (right)
+  // Client (left) and Invoice meta (right)
   const clientY = yBase + 120
     doc.setFontSize(11)
     doc.setTextColor(0)
@@ -114,7 +114,7 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
 
     const metaX = 360
     doc.setFontSize(10)
-    // Use safe date handling: prefer issueDate, fall back to createdAt; show empty if invalid
+  // Use safe date handling: prefer issueDate, fall back to createdAt; show empty if invalid
     const safeDate = (d: any) => {
       try {
         const dt = new Date(d)
@@ -129,7 +129,7 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
     if (serviceDate) doc.text(`Leistungsdatum: ${serviceDate}`, metaX, clientY + 14)
     if (dueDate) doc.text(`Fälligkeitsdatum: ${dueDate}`, metaX, clientY + 28)
 
-    // Items table
+  // Items table
     const head = showPrices ? ['Menge', 'Art.Nr.', 'Bezeichnung', 'Einzelpreis', 'Gesamt'] : ['Menge', 'Art.Nr.', 'Bezeichnung']
     const body = invoice.lineItems.map((item) => {
       const sku = (item as any).sku || ''
@@ -160,13 +160,13 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
 
     const finalY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || (clientY + 180)
 
-    // Totals box on the right: compute totals from line items (avoid relying on possibly-mismatched invoice fields)
+  // Totals box on the right: compute totals from line items (avoid relying on possibly-mismatched invoice fields)
     if (showPrices) {
       const totalsX = 360
       let line1Y = finalY + 28 // give a bit more breathing room
       const lineGap = 16
 
-      // If there isn't enough space on the current page for totals, add a new page and reset Y
+  // If there isn't enough space on the current page for totals, add a new page and reset Y
       const pageHeight = typeof (doc as any).internal.pageSize.getHeight === 'function'
         ? (doc as any).internal.pageSize.getHeight()
         : (doc as any).internal.pageSize.height
@@ -178,7 +178,7 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
         line1Y = 60
       }
 
-      // compute subtotal from invoice.lineItems to avoid duplication errors
+  // compute subtotal from invoice.lineItems to avoid duplication errors
       const computedSubtotal = invoice.lineItems.reduce((s, it) => s + (Number(it.unitPrice ?? 0) * Number(it.quantity ?? 0)), 0)
       const taxRateNum = Number(invoice.taxRate ?? 0)
       const computedTax = computedSubtotal * (taxRateNum / 100)
@@ -204,7 +204,7 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
       doc.setFont('helvetica', 'normal')
     }
 
-    // Footer with bank/contact info
+  // Footer with bank/contact info
     const footerY = 780
     doc.setFontSize(9)
     doc.setTextColor(100)
@@ -214,7 +214,7 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
   const filename = showPrices ? `invoice-${invoice.id}.pdf` : `invoice-${invoice.id}-no-prices.pdf`;
   // debug markers so we can confirm the client generator is executed in the browser
   try { console.log('[PDF] generating client PDF for', invoice.id) } catch {}
-  try { toast.info('Generating PDF...') } catch {}
+  try { toast.info('PDF wird erstellt...') } catch {}
   doc.save(filename);
   }
 
@@ -232,13 +232,13 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
             </Button>
             <div>
               <CardTitle className="flex items-center gap-3">
-                Invoice {invoice.invoiceNumber}
+                Rechnung {invoice.invoiceNumber}
                 {/* compact inline badge + select positioned under the badge */}
                 <div className="flex items-center gap-2">
                   <div className="relative inline-flex items-center">
                     <button
                       type="button"
-                      aria-label="Change status"
+                      aria-label="Status ändern"
                       onClick={() => setStatusSelectOpen(true)}
                       className="-ml-1 rounded-md focus:outline-none"
                     >
@@ -246,39 +246,39 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
                     </button>
 
                     {/* <Select
-                      value={invoice.status}
-                      open={statusSelectOpen}
-                      onOpenChange={setStatusSelectOpen}
-          onValueChange={async (value: string) => {
-                        try {
-            // convert to known invoice status if possible
-            const statusValue = toInvoiceStatus(value) || (value as Invoice["status"])
-            await invoiceService.updateInvoice(invoice.id, { status: statusValue })
-                          toast.success(`Status updated to ${value}`)
-                          setStatusSelectOpen(false)
-                          setTimeout(() => window.location.reload(), 250)
-                        } catch (err) {
-                          toast.error(err instanceof Error ? err.message : "Failed to update status")
-                        }
-                      }}
-                    >
-                      <SelectTrigger className="ml-2 h-9 w-36 rounded-md text-sm px-3 py-1 bg-white border border-[#e5e8f0] shadow-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent position="popper" sideOffset={6} className="!w-36 mt-1 shadow-lg rounded-md">
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="maker">Maker</SelectItem>
-                        <SelectItem value="sent">Sent</SelectItem>
-                        <SelectItem value="paid">Paid</SelectItem>
-                        <SelectItem value="not_paid">Not Paid</SelectItem>
-                        <SelectItem value="completed">Completed</SelectItem>
-                      </SelectContent>
-                    </Select> */}
+                              value={invoice.status}
+                              open={statusSelectOpen}
+                              onOpenChange={setStatusSelectOpen}
+                  onValueChange={async (value: string) => {
+                                try {
+                    // convert to known invoice status if possible
+                    const statusValue = toInvoiceStatus(value) || (value as Invoice["status"])
+                    await invoiceService.updateInvoice(invoice.id, { status: statusValue })
+                                  toast.success(`Status geändert zu ${value}`)
+                                  setStatusSelectOpen(false)
+                                  setTimeout(() => window.location.reload(), 250)
+                                } catch (err) {
+                                  toast.error(err instanceof Error ? err.message : "Fehler beim Aktualisieren des Status")
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="ml-2 h-9 w-36 rounded-md text-sm px-3 py-1 bg-white border border-[#e5e8f0] shadow-sm">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent position="popper" sideOffset={6} className="!w-36 mt-1 shadow-lg rounded-md">
+                                <SelectItem value="pending">Ausstehend</SelectItem>
+                                <SelectItem value="maker">In Bearbeitung</SelectItem>
+                                <SelectItem value="sent">Versendet</SelectItem>
+                                <SelectItem value="paid">Bezahlt</SelectItem>
+                                <SelectItem value="not_paid">Nicht bezahlt</SelectItem>
+                                <SelectItem value="completed">Abgeschlossen</SelectItem>
+                              </SelectContent>
+                            </Select> */}
                   </div>
                 </div>
               </CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
-                Created on {new Date(invoice.createdAt).toLocaleDateString()}
+                Erstellt am {new Date(invoice.createdAt).toLocaleDateString()}
               </p>
             </div>
           </div>
@@ -286,27 +286,27 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
             { (invoice.status === "pending" || invoice.status === "maker") && onSend && (
               <Button onClick={onSend}>
                 <Send className="mr-2 h-4 w-4" />
-                Send Invoice
+                Rechnung senden
               </Button>
             )}
             <Button variant="outline" onClick={onEdit}>
-              Edit
+              Bearbeiten
             </Button>
 
             {/* Single Download dropdown: Client PDF (with prices) / Maker PDF (no prices) */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" aria-label="Download PDF">
+                <Button variant="outline" aria-label="PDF herunterladen">
                   <Download className="mr-2 h-4 w-4" />
-                  Download PDF
+                  PDF herunterladen
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={handleDownloadWithPrices}>
-                  Client PDF (with prices)
+                  Kunden-PDF (mit Preisen)
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleDownloadWithoutPrices}>
-                  Maker PDF (no prices)
+                  Interne PDF (ohne Preise)
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -319,7 +319,7 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
         {/* Client Information */}
         <Card>
           <CardHeader>
-            <CardTitle>Bill To</CardTitle>
+            <CardTitle>Rechnung an</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
@@ -333,27 +333,27 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
         {/* Invoice Information */}
         <Card>
           <CardHeader>
-            <CardTitle>Invoice Details</CardTitle>
+            <CardTitle>Rechnungsdetails</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
               <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Issue Date:</span>
+                <span className="text-sm text-muted-foreground">Ausstellungsdatum:</span>
                 <span className="text-sm">{new Date(invoice.issueDate).toLocaleDateString()}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Due Date:</span>
+                <span className="text-sm text-muted-foreground">Fälligkeitsdatum:</span>
                 <span className="text-sm">{new Date(invoice.dueDate).toLocaleDateString()}</span>
               </div>
               {invoice.sentAt && (
                 <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Sent Date:</span>
+                  <span className="text-sm text-muted-foreground">Versendet am:</span>
                   <span className="text-sm">{new Date(invoice.sentAt).toLocaleDateString()}</span>
                 </div>
               )}
               {invoice.paidAt && (
                 <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Paid Date:</span>
+                  <span className="text-sm text-muted-foreground">Bezahlt am:</span>
                   <span className="text-sm">{new Date(invoice.paidAt).toLocaleDateString()}</span>
                 </div>
               )}
@@ -365,16 +365,16 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
       {/* Line Items */}
       <Card>
         <CardHeader>
-          <CardTitle>Items</CardTitle>
+          <CardTitle>Positionen</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Description</TableHead>
-                <TableHead className="text-right">Qty</TableHead>
-                <TableHead className="text-right">Unit Price</TableHead>
-                <TableHead className="text-right">Total</TableHead>
+                <TableHead>Beschreibung</TableHead>
+                <TableHead className="text-right">Menge</TableHead>
+                <TableHead className="text-right">Einzelpreis</TableHead>
+                <TableHead className="text-right">Gesamt</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -398,15 +398,15 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
           <div className="flex justify-end mt-6">
             <div className="w-64 space-y-2">
               <div className="flex justify-between">
-                <span>Subtotal:</span>
+                <span>Zwischensumme:</span>
                 <span>{formatCurrency(invoice.subtotal, DEFAULT_CURRENCY)}</span>
               </div>
               <div className="flex justify-between">
-                <span>Tax ({invoice.taxRate}%):</span>
+                <span>Umsatzsteuer ({invoice.taxRate}%):</span>
                 <span>{formatCurrency(invoice.taxAmount, DEFAULT_CURRENCY)}</span>
               </div>
               <div className="flex justify-between font-bold text-lg border-t pt-2">
-                <span>Total:</span>
+                <span>Gesamt:</span>
                 <span>{formatCurrency(invoice.total, DEFAULT_CURRENCY)}</span>
               </div>
             </div>
@@ -418,7 +418,7 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
       {invoice.notes && (
         <Card>
           <CardHeader>
-            <CardTitle>Notes</CardTitle>
+            <CardTitle>Notizen</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm">{invoice.notes}</p>

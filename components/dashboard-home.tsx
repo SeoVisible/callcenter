@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { StatsSummary } from "@/components/stats-summary"
+import { formatStatusLabel } from '@/lib/status'
 
 interface Stats {
   users: number
@@ -96,7 +97,7 @@ export function DashboardHome() {
   if (loading) {
     return (
       <div className="min-h-[300px] flex items-center justify-center">
-        <div className="text-sm text-muted-foreground">Loading dashboard...</div>
+        <div className="text-sm text-muted-foreground">Lade Übersicht...</div>
       </div>
     )
   }
@@ -105,11 +106,11 @@ export function DashboardHome() {
     // Fatal: no stats at all (e.g., network failure). Show error and retry.
     return (
       <div className="space-y-4">
-        <div className="p-4 bg-red-50 border border-red-200 rounded">
+          <div className="p-4 bg-red-50 border border-red-200 rounded">
           <div className="flex items-start justify-between">
             <div className="text-sm text-red-700">
-              <strong>Could not load statistics.</strong>
-              <div className="text-xs text-red-600 mt-1">{error || 'Failed to load stats'}</div>
+          <strong>Konnte Statistiken nicht laden.</strong>
+            <div className="text-xs text-red-600 mt-1">{error || 'Fehler beim Laden der Statistiken'}</div>
             </div>
             <div>
               <Button
@@ -141,16 +142,16 @@ export function DashboardHome() {
                     setStats(newStats)
                     if (data.mock) {
                       const msgs = data.errors && Array.isArray(data.errors) ? data.errors.map((e: { key: string; message: string }) => `${e.key}: ${e.message}`) : []
-                      setInfo(`Using mock data: ${msgs.join("; ")}`)
+                      setInfo(`Verwende Mock-Daten: ${msgs.join("; ")}`)
                     } else if (data.errors && data.errors.length) {
                       const msgs = data.errors.map((e: { key: string; message: string }) => `${e.key}: ${e.message}`)
-                      setInfo(`Partial errors: ${msgs.join("; ")}`)
+                      setInfo(`Teilweise Fehler: ${msgs.join("; ")}`)
                     } else {
                       setInfo(null)
                     }
                   } catch (err) {
                       // On retry failure, show fallback stats so graphs still display
-                      setInfo("Retry failed — showing fallback values")
+                      setInfo("Wiederholung fehlgeschlagen — Platzhalterwerte werden angezeigt")
                       setStats({
                         users: 0,
                         products: 0,
@@ -164,14 +165,14 @@ export function DashboardHome() {
                   }
                 }}
               >
-                Retry
+                Erneut versuchen
               </Button>
             </div>
           </div>
         </div>
 
         <div className="min-h-[300px] flex items-center justify-center">
-          <div className="text-sm text-muted-foreground">{error || 'Failed to load stats'}</div>
+          <div className="text-sm text-muted-foreground">{error || 'Fehler beim Laden der Statistiken'}</div>
         </div>
       </div>
     )
@@ -204,41 +205,41 @@ export function DashboardHome() {
   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader>
-            <CardTitle>Users</CardTitle>
+            <CardTitle>Benutzer</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{users}</div>
-            <div className="text-sm text-muted-foreground">Total user accounts</div>
+            <div className="text-sm text-muted-foreground">Gesamt Benutzerkonten</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Products</CardTitle>
+            <CardTitle>Produkte</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{products}</div>
-            <div className="text-sm text-muted-foreground">Total products</div>
+            <div className="text-sm text-muted-foreground">Gesamt Produkte</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Clients</CardTitle>
+            <CardTitle>Kunden</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{clients}</div>
-            <div className="text-sm text-muted-foreground">Total clients</div>
+            <div className="text-sm text-muted-foreground">Gesamt Kunden</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Invoices</CardTitle>
+            <CardTitle>Rechnungen</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{invoices}</div>
-            <div className="text-sm text-muted-foreground">Total invoices</div>
+            <div className="text-sm text-muted-foreground">Gesamt Rechnungen</div>
           </CardContent>
         </Card>
       </div>
@@ -249,7 +250,7 @@ export function DashboardHome() {
   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
           <CardHeader>
-            <CardTitle>Invoices by status</CardTitle>
+            <CardTitle>Rechnungen nach Status</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="mt-2 space-y-4">
@@ -270,15 +271,15 @@ export function DashboardHome() {
                       const barColor = value > 0 ? colorClass : 'bg-slate-300'
                           return (
                             <div key={k} className="flex flex-col items-center w-1/6 h-full"
-                                onMouseMove={(e) => {
-                                  setStatusTooltip({ visible: true, x: e.clientX, y: e.clientY, label: k.replace('_', ' '), value })
-                                }}
+                                      onMouseMove={(e) => {
+                                        setStatusTooltip({ visible: true, x: e.clientX, y: e.clientY, label: formatStatusLabel(k), value })
+                                      }}
                               onMouseLeave={() => setStatusTooltip((t) => ({ ...t, visible: false }))}
                             >
                               <div className="w-full bg-slate-100 rounded-b-md flex flex-col justify-end h-full" style={{ height: '100%' }}>
                                 <div className={`${barColor} w-full rounded-t-md`} style={{ height: barHeight, minHeight: hasAnyInvoice ? undefined : 6 }} />
                               </div>
-                              <div className="text-sm mt-2 capitalize">{k.replace('_', ' ')} ({value})</div>
+                              <div className="text-sm mt-2 capitalize">{formatStatusLabel(k)} ({value})</div>
                             </div>
                           )
                 })}
@@ -297,7 +298,7 @@ export function DashboardHome() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Product scope</CardTitle>
+            <CardTitle>Produktumfang</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-6">
@@ -312,8 +313,8 @@ export function DashboardHome() {
 
               <div>
                 <div className="text-lg font-medium">Global: {productsByScope.global}</div>
-                <div className="text-sm text-muted-foreground mb-2">Personal: {productsByScope.personal}</div>
-                <div className="text-xs text-muted-foreground">Total products: {products}</div>
+                <div className="text-sm text-muted-foreground mb-2">Persönlich: {productsByScope.personal}</div>
+                <div className="text-xs text-muted-foreground">Gesamt Produkte: {products}</div>
               </div>
             </div>
           </CardContent>

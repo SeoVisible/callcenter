@@ -22,34 +22,39 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           <CardTitle>Product Statistics</CardTitle>
         </CardHeader>
         <CardContent>
-          {!data && <div className="text-sm text-muted-foreground">No data available</div>}
+          <CardTitle>Produktstatistiken</CardTitle>
+          {!data && <div className="text-sm text-muted-foreground">Keine Daten verfügbar</div>}
+
           {data && (
-            <div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <div className="text-sm text-muted-foreground">Total sold</div>
+                  <div className="text-sm text-muted-foreground">Insgesamt verkauft</div>
                   <div className="text-xl font-semibold">{data.totalSold}</div>
                 </div>
                 <div>
-                  <div className="text-sm text-muted-foreground">Revenue this year</div>
+                  <div className="text-sm text-muted-foreground">Umsatz dieses Jahres</div>
                   <div className="text-xl font-semibold">{formatCurrency(data.revenueThisYear, DEFAULT_CURRENCY)}</div>
                 </div>
                 <div>
-                  <div className="text-sm text-muted-foreground">Profit this year</div>
+                  <div className="text-sm text-muted-foreground">Gewinn dieses Jahres</div>
                   <div className="text-xl font-semibold">{formatCurrency(data.profitThisYear, DEFAULT_CURRENCY)}</div>
                 </div>
               </div>
 
               <div>
-                <h4 className="text-sm text-muted-foreground">Top buyers</h4>
+                <h4 className="text-sm text-muted-foreground">Top-Käufer</h4>
                 <ul className="mt-2 space-y-2">
-                  {data.topClients.length === 0 && <li className="text-sm text-muted-foreground">No buyers yet</li>}
-                  {data.topClients.map((c) => (
-                    <li key={c.id} className="flex justify-between">
-                      <span>{c.name}</span>
-                      <span className="text-sm text-muted-foreground">{c.quantity} — {formatCurrency(c.revenue, DEFAULT_CURRENCY)}</span>
-                    </li>
-                  ))}
+                  {data.topClients.length === 0 ? (
+                    <li className="text-sm text-muted-foreground">Noch keine Käufer</li>
+                  ) : (
+                    data.topClients.map((c) => (
+                      <li key={c.id} className="flex justify-between items-center">
+                        <span>{c.name}</span>
+                        <span className="text-sm text-muted-foreground">{c.quantity} — {formatCurrency(c.revenue, DEFAULT_CURRENCY)}</span>
+                      </li>
+                    ))
+                  )}
                 </ul>
               </div>
             </div>

@@ -19,12 +19,12 @@ export function DashboardLayout({ children, activeSection, onSectionChange }: Da
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const navigationItems = [
-    { id: "dashboard", label: "Dashboard", icon: FileText, roles: ["superadmin", "user"] },
+    { id: "dashboard", label: "Übersicht", icon: FileText, roles: ["superadmin", "user"] },
     // Only show User Management to superadmin in production environment
-    { id: "users", label: "User Management", icon: Users, roles: ["superadmin"] },
-    { id: "products", label: "Products", icon: Package, roles: ["superadmin", "user"] },
-    { id: "clients", label: "Clients", icon: UserCheck, roles: ["superadmin", "user"] },
-    { id: "invoices", label: "Invoices", icon: FileText, roles: ["superadmin", "user"] },
+    { id: "users", label: "Benutzerverwaltung", icon: Users, roles: ["superadmin"] },
+    { id: "products", label: "Produkte", icon: Package, roles: ["superadmin", "user"] },
+    { id: "clients", label: "Kunden", icon: UserCheck, roles: ["superadmin", "user"] },
+  { id: "invoices", label: "Rechnungen", icon: FileText, roles: ["superadmin", "user"] },
   ]
 
   // Fallback to 'user' role when no user is present; only include items that match the user's role
@@ -97,7 +97,7 @@ export function DashboardLayout({ children, activeSection, onSectionChange }: Da
           <div className="p-4 border-t border-[#e5e8f0]">
             <Button variant="outline" className="w-full justify-start bg-transparent text-[#37445c]" onClick={handleLogout}>
               <LogOut className="mr-2 h-4 w-4" />
-              Sign Out
+              Abmelden
             </Button>
           </div>
         </div>

@@ -64,8 +64,8 @@ export function StatsSummary() {
     return () => { cancelled = true }
   }, [monthsSelection, metricSelection])
 
-  if (loading) return <div className="text-sm text-muted-foreground">Loading stats summary...</div>
-  if (!data) return <div className="text-sm text-muted-foreground">No summary available</div>
+  if (loading) return <div className="text-sm text-muted-foreground">Lade Zusammenfassung...</div>
+  if (!data) return <div className="text-sm text-muted-foreground">Keine Zusammenfassung verfügbar</div>
 
   // Build `monthsSelection` months series (fill with zeros if API returned fewer)
   const buildMonths = (count: number) => {
@@ -109,22 +109,22 @@ export function StatsSummary() {
         <div className="flex items-center gap-2 w-full max-w-md">
           <Select onValueChange={(v: string) => setMonthsSelection(Number(v))}>
             <SelectTrigger size="sm">
-              <SelectValue placeholder={`${monthsSelection} months`} />
+              <SelectValue placeholder={`${monthsSelection} Monate`} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="3">Last 3 months</SelectItem>
-              <SelectItem value="6">Last 6 months</SelectItem>
-              <SelectItem value="12">Last 12 months</SelectItem>
+              <SelectItem value="3">Letzte 3 Monate</SelectItem>
+              <SelectItem value="6">Letzte 6 Monate</SelectItem>
+              <SelectItem value="12">Letzte 12 Monate</SelectItem>
             </SelectContent>
           </Select>
 
           <Select onValueChange={(v: string) => setMetricSelection(v === 'invoices' ? 'invoices' : 'revenue')}>
             <SelectTrigger size="sm">
-              <SelectValue placeholder={metricSelection === 'revenue' ? 'Revenue' : 'Invoices'} />
+              <SelectValue placeholder={metricSelection === 'revenue' ? 'Umsatz' : 'Rechnungen'} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="revenue">Revenue</SelectItem>
-              <SelectItem value="invoices">Invoice count</SelectItem>
+              <SelectItem value="revenue">Umsatz</SelectItem>
+              <SelectItem value="invoices">Anzahl Rechnungen</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -136,73 +136,73 @@ export function StatsSummary() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader>
-            <CardTitle>
-              {metricSelection === 'revenue' ? `Total Revenue (${DEFAULT_CURRENCY})` : 'Total Invoices'} (last {monthsSelection}m)
+              <CardTitle>
+              {metricSelection === 'revenue' ? `Gesamtumsatz (${DEFAULT_CURRENCY})` : 'Gesamtanzahl Rechnungen'} (letzte {monthsSelection}m)
             </CardTitle>
           </CardHeader>
           <CardContent>
-              <div className="text-2xl font-bold">
+            <div className="text-2xl font-bold">
               {(() => {
                 const total = monthlyRevenueFixed.reduce((s, r) => s + r.revenue, 0)
                 return metricSelection === 'revenue' ? formatCurrency(total, DEFAULT_CURRENCY) : String(Math.round(total))
               })()}
             </div>
-            <div className="text-sm text-muted-foreground">Sum of invoice line items</div>
+            <div className="text-sm text-muted-foreground">Summe der Rechnungspositionen</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Top Product</CardTitle>
+            <CardTitle>Top-Produkt</CardTitle>
           </CardHeader>
           <CardContent>
             {data.topProducts[0] ? (
               <>
                 <div className="text-lg font-medium">{data.topProducts[0].name}</div>
-                <div className="text-sm text-muted-foreground">Revenue: {formatCurrency(data.topProducts[0].revenue, DEFAULT_CURRENCY)}</div>
+                <div className="text-sm text-muted-foreground">Umsatz: {formatCurrency(data.topProducts[0].revenue, DEFAULT_CURRENCY)}</div>
               </>
             ) : (
-              <div className="text-sm text-muted-foreground">No products yet</div>
+              <div className="text-sm text-muted-foreground">Noch keine Produkte</div>
             )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Top Client</CardTitle>
+            <CardTitle>Bester Kunde</CardTitle>
           </CardHeader>
           <CardContent>
             {data.topClients[0] ? (
               <>
                 <div className="text-lg font-medium">{data.topClients[0].name}</div>
-                <div className="text-sm text-muted-foreground">Revenue: {formatCurrency(data.topClients[0].revenue, DEFAULT_CURRENCY)}</div>
+                <div className="text-sm text-muted-foreground">Umsatz: {formatCurrency(data.topClients[0].revenue, DEFAULT_CURRENCY)}</div>
               </>
             ) : (
-              <div className="text-sm text-muted-foreground">No clients yet</div>
+              <div className="text-sm text-muted-foreground">Noch keine Kunden</div>
             )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Top Selling User</CardTitle>
+            <CardTitle>Top-Verkaufender Benutzer</CardTitle>
           </CardHeader>
             <CardContent>
               {data.revenueByUser[0] ? (
                 <UserLink userId={data.revenueByUser[0].id} name={data.revenueByUser[0].name} count={data.revenueByUser[0].invoiceCount} revenue={data.revenueByUser[0].revenue} />
               ) : (
-                <div className="text-sm text-muted-foreground">No users yet</div>
+                <div className="text-sm text-muted-foreground">Noch keine Benutzer</div>
               )}
             </CardContent>
         </Card>
       </div>
 
       <Card>
-        <CardHeader>
+          <CardHeader>
           <CardTitle>
             {metricSelection === 'revenue'
-              ? `Monthly Revenue (${DEFAULT_CURRENCY}) (last ${monthsSelection} months)`
-              : `Monthly Invoices (last ${monthsSelection} months)`}
+              ? `Monatlicher Umsatz (${DEFAULT_CURRENCY}) (letzte ${monthsSelection} Monate)`
+              : `Monatliche Rechnungen (letzte ${monthsSelection} Monate)`}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -244,11 +244,11 @@ export function StatsSummary() {
             })}
           </div>
             {!hasAnyRevenue && (
-              <div className="mt-2 text-sm text-muted-foreground">
-                {metricSelection === 'revenue'
-                  ? `No revenue recorded in the last ${monthsSelection} months.`
-                  : `No invoices recorded in the last ${monthsSelection} months.`}
-              </div>
+                <div className="mt-2 text-sm text-muted-foreground">
+                  {metricSelection === 'revenue'
+                    ? `In den letzten ${monthsSelection} Monaten wurden keine Umsätze erfasst.`
+                    : `In den letzten ${monthsSelection} Monaten wurden keine Rechnungen erfasst.`}
+                </div>
             )}
 
             {tooltip.visible && (
@@ -269,7 +269,7 @@ export function StatsSummary() {
 
 function UserLink({ userId, name, count, revenue }: { userId: string | null, name: string | null, count: number, revenue: number }) {
   const router = useRouter()
-  if (!userId) return <div className="text-sm text-muted-foreground">Unknown user</div>
+  if (!userId) return <div className="text-sm text-muted-foreground">Unbekannter Benutzer</div>
   return (
     <button
       onClick={(e) => {
@@ -280,7 +280,7 @@ function UserLink({ userId, name, count, revenue }: { userId: string | null, nam
       className="text-left no-underline hover:underline w-full"
     >
       <div className="text-lg font-medium">{name || 'Unknown'}</div>
-  <div className="text-sm text-muted-foreground">Invoices: {count} — Revenue: {formatCurrency(revenue, DEFAULT_CURRENCY)}</div>
+  <div className="text-sm text-muted-foreground">Rechnungen: {count} — Umsatz: {formatCurrency(revenue, DEFAULT_CURRENCY)}</div>
     </button>
   )
 }

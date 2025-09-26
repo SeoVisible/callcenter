@@ -22,13 +22,13 @@ export function ProductStatsDialog({ id }: Props) {
 
   return (
     <>
-      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>Statistics</Button>
+  <Button variant="outline" size="sm" onClick={() => setOpen(true)}>Statistiken</Button>
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="bg-white rounded-lg shadow-lg w-11/12 max-w-2xl p-4">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Product Statistics</h3>
-              <Button variant="ghost" onClick={() => setOpen(false)}>Close</Button>
+              <h3 className="text-lg font-semibold">Produktstatistiken</h3>
+              <Button variant="ghost" onClick={() => setOpen(false)}>Schließen</Button>
             </div>
             {loading && (
               <div className="py-8 flex justify-center"><Loader2 className="h-6 w-6 animate-spin"/></div>
@@ -37,23 +37,23 @@ export function ProductStatsDialog({ id }: Props) {
               <div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                   <div>
-                    <div className="text-sm text-muted-foreground">Total sold</div>
+            <div className="text-sm text-muted-foreground">Verkauft (gesamt)</div>
                     <div className="text-xl font-semibold">{stats.totalSold}</div>
                   </div>
                   <div>
-                    <div className="text-sm text-muted-foreground">Revenue this year</div>
+            <div className="text-sm text-muted-foreground">Umsatz dieses Jahres</div>
                     <div className="text-xl font-semibold">{formatCurrency(stats.revenueThisYear, DEFAULT_CURRENCY)}</div>
                   </div>
                   <div>
-                    <div className="text-sm text-muted-foreground">Profit this year</div>
+            <div className="text-sm text-muted-foreground">Gewinn dieses Jahres</div>
                     <div className="text-xl font-semibold">{formatCurrency(stats.profitThisYear, DEFAULT_CURRENCY)}</div>
                   </div>
                 </div>
 
                 <div>
-                  <div className="text-sm text-muted-foreground">Top buyers</div>
+                  <div className="text-sm text-muted-foreground">Top-Käufer</div>
                   <ul className="mt-2 space-y-2">
-                    {stats.topClients.length === 0 && <li className="text-sm text-muted-foreground">No buyers yet</li>}
+                      {stats.topClients.length === 0 && <li className="text-sm text-muted-foreground">Noch keine Käufer</li>}
                     {stats.topClients.map((c) => (
                       <li key={c.id} className="flex justify-between">
                         <span>{c.name}</span>

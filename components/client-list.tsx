@@ -195,7 +195,7 @@ export function ClientList({ onAddClient, onEditClient }: ClientListProps) {
           {clients.length === 0 && (
             <div className="text-center py-8">
               <p className="text-muted-foreground">
-                No clients found. Add your first client to get started.
+                Keine Kunden gefunden. Fügen Sie Ihren ersten Kunden hinzu, um zu beginnen.
               </p>
             </div>
           )}
@@ -205,18 +205,16 @@ export function ClientList({ onAddClient, onEditClient }: ClientListProps) {
       <AlertDialog open={!!deleteClient} onOpenChange={() => setDeleteClient(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Client</AlertDialogTitle>
+            <AlertDialogTitle>Kunden löschen</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete &quot;{deleteClient?.name}&quot; from{" "}
-              {deleteClient?.company}&quot;? This action cannot be undone and will affect
-              any associated invoices.
+              Sind Sie sicher, dass Sie &quot;{deleteClient?.name}&quot; aus {deleteClient?.company} löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden und wirkt sich auf zugehörige Rechnungen aus.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} disabled={deleting}>
               {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Delete
+              Löschen
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

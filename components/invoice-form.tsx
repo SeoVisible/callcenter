@@ -218,19 +218,19 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
     setLoading(true)
 
     if (!user) {
-      setError("User not authenticated")
+      setError("Benutzer nicht authentifiziert")
       setLoading(false)
       return
     }
 
     if (lineItems.length === 0) {
-      setError("Please add at least one line item")
+      setError("Bitte fügen Sie mindestens eine Position hinzu")
       setLoading(false)
       return
     }
 
     if (!formData.clientId) {
-      setError("Please select a client")
+      setError("Bitte wählen Sie einen Kunden aus")
       setLoading(false)
       return
     }
@@ -238,7 +238,7 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
     try {
       const selectedClient = clients.find((c) => c.id === formData.clientId)
       if (!selectedClient) {
-        setError("Selected client not found")
+        setError("Ausgewählter Kunde nicht gefunden")
         return
       }
 
@@ -254,7 +254,7 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
           if (item.productId) {
             const prod = products.find((p) => p.id === item.productId)
               if (prod && item.unitPrice < prod.price) {
-              setError(`Unit price for "${item.productName}" cannot be lower than product price (${formatCurrency(prod.price, DEFAULT_CURRENCY)})`)
+              setError(`Der Einzelpreis für "${item.productName}" darf nicht unter dem Produktpreis liegen (${formatCurrency(prod.price, DEFAULT_CURRENCY)})`)
               setLoading(false)
               return
             }
@@ -276,8 +276,8 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
           notes: formData.notes,
         }
         await invoiceService.updateInvoice(invoice.id, updateData)
-        toast.success("Success", {
-          description: "Invoice updated successfully",
+        toast.success("Erfolg", {
+          description: "Rechnung erfolgreich aktualisiert",
         })
       } else {
         // Validate unit prices for new invoice as well
@@ -307,8 +307,8 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
           createdBy: user.id,
         }
         await invoiceService.createInvoice(createData)
-        toast.success("Success", {
-          description: "Invoice created successfully",
+        toast.success("Erfolg", {
+          description: "Rechnung erfolgreich erstellt",
         })
       }
       onSuccess()
@@ -325,7 +325,7 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
         <Button variant="outline" size="icon" onClick={onCancel}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <CardTitle>{invoice ? "Edit Invoice" : "Create New Invoice"}</CardTitle>
+  <CardTitle>{invoice ? "Rechnung bearbeiten" : "Neue Rechnung erstellen"}</CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -333,7 +333,7 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {clientId ? (
               <div className="space-y-2">
-                <Label>Client</Label>
+                <Label>Kunde</Label>
                 <div className="bg-[#f5f7fc] border border-[#e5e8f0] rounded-lg px-4 py-2 text-[#37445c]">
                   {(() => {
                     const c = clients.find(c => c.id === formData.clientId);
@@ -343,13 +343,13 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
               </div>
             ) : (
               <div className="space-y-2">
-                <Label htmlFor="client">Client</Label>
+                <Label htmlFor="client">Kunde</Label>
                 <Select
                   value={formData.clientId}
                   onValueChange={(value) => setFormData({ ...formData, clientId: value })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select a client" />
+                    <SelectValue placeholder="Kunden auswählen" />
                   </SelectTrigger>
                   <SelectContent>
                     {clients.map((client) => (
@@ -362,7 +362,7 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="dueDate">Due Date</Label>
+              <Label htmlFor="dueDate">Fälligkeitsdatum</Label>
               <Input
                 id="dueDate"
                 type="date"
@@ -382,12 +382,12 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="maker">Maker</SelectItem>
-                    <SelectItem value="sent">Sent</SelectItem>
-                    <SelectItem value="paid">Paid</SelectItem>
-                    <SelectItem value="not_paid">Not Paid</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="pending">Ausstehend</SelectItem>
+                    <SelectItem value="maker">In Bearbeitung</SelectItem>
+                    <SelectItem value="sent">Versendet</SelectItem>
+                    <SelectItem value="paid">Bezahlt</SelectItem>
+                    <SelectItem value="not_paid">Nicht bezahlt</SelectItem>
+                    <SelectItem value="completed">Abgeschlossen</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -397,14 +397,14 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
           {/* Line Items */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-medium">Line Items</h3>
+              <h3 className="text-lg font-medium">Positionen</h3>
               <div className="flex items-center gap-2">
                 <Button type="button" variant="outline" onClick={addLineItem}>
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Item
+                  Position hinzufügen
                 </Button>
                 <Button type="button" variant="outline" onClick={addShipping}>
-                  Add Shipping
+                  Versand hinzufügen
                 </Button>
               </div>
             </div>
@@ -415,11 +415,11 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Product</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Qty</TableHead>
-                    <TableHead>Unit Price</TableHead>
-                    <TableHead>Total</TableHead>
+                    <TableHead>Produkt</TableHead>
+                    <TableHead>Beschreibung</TableHead>
+                    <TableHead>Menge</TableHead>
+                    <TableHead>Einzelpreis</TableHead>
+                    <TableHead>Gesamt</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -441,15 +441,15 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
                               value={item.productId ?? ""}
                               onValueChange={(value) => updateLineItem(index, "productId", value === "" ? null : value)}
                             >
-                              <SelectTrigger className="w-full">
-                                <SelectValue placeholder="Select product" />
+                                <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Produkt auswählen" />
                               </SelectTrigger>
                               <SelectContent>
                                 {/* Shipping options first (normalize label to 'Shipping') */}
                                 {products.filter(p => ((p.category||"").toLowerCase() === "shipping") || p.name.toLowerCase().includes("shipping")).map((product) => (
                                   <SelectItem key={`ship-${product.id}`} value={product.id}>
                                     <div className="flex items-center justify-between w-full">
-                                      <span>Shipping</span>
+                                      <span>Versand</span>
                                       <span className="text-sm text-muted-foreground">{formatCurrency(product.price, DEFAULT_CURRENCY)}</span>
                                     </div>
                                   </SelectItem>
@@ -457,7 +457,7 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
 
                                 {/* If no shipping product exists, allow a virtual shipping option */}
                                 {products.every(p => !(((p.category||"").toLowerCase() === "shipping") || p.name.toLowerCase().includes("shipping"))) && (
-                                  <SelectItem key="virtual-shipping" value="virtual-shipping">Shipping</SelectItem>
+                                  <SelectItem key="virtual-shipping" value="virtual-shipping">Versand</SelectItem>
                                 )}
 
                                 {/* Then list remaining non-shipping products */}
@@ -472,10 +472,10 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
                         })()}
                       </TableCell>
                       <TableCell>
-                        <Input
+                          <Input
                           value={item.description}
                           onChange={(e) => updateLineItem(index, "description", e.target.value)}
-                          placeholder="Description"
+                          placeholder="Beschreibung"
                         />
                       </TableCell>
                       <TableCell>
@@ -518,11 +518,11 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
             <div className="flex justify-end">
               <div className="w-64 space-y-2">
                 <div className="flex justify-between">
-                  <span>Subtotal:</span>
+                  <span>Zwischensumme:</span>
                   <span>{formatCurrency(calculateSubtotal(), DEFAULT_CURRENCY)}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <Label htmlFor="taxRate">Tax Rate (%):</Label>
+                  <Label htmlFor="taxRate">Steuersatz (%):</Label>
                   <Input
                     id="taxRate"
                     type="number"
@@ -535,11 +535,11 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
                   />
                 </div>
                 <div className="flex justify-between">
-                  <span>Tax:</span>
+                  <span>Umsatzsteuer:</span>
                   <span>{formatCurrency(calculateTax(), DEFAULT_CURRENCY)}</span>
                 </div>
                 <div className="flex justify-between font-bold text-lg border-t pt-2">
-                  <span>Total:</span>
+                  <span>Gesamt:</span>
                   <span>{formatCurrency(calculateTotal(), DEFAULT_CURRENCY)}</span>
                 </div>
               </div>
@@ -548,12 +548,12 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
 
           {/* Notes */}
           <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
+            <Label htmlFor="notes">Notizen</Label>
             <Textarea
               id="notes"
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              placeholder="Enter any additional notes for this invoice"
+              placeholder="Weitere Notizen zur Rechnung eingeben"
               rows={3}
             />
           </div>
