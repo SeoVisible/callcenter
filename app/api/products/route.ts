@@ -45,9 +45,61 @@ export async function POST(req: Request) {
   const safeData = {
     ...data,
     stock: Number.isFinite(data?.stock) ? Number(data.stock) : 0,
+    // Coerce buyingPrice if present
+    ...(data?.buyingPrice !== undefined ? { buyingPrice: Number(data.buyingPrice) || 0 } : {}),
   }
-  const product = await prisma.product.create({ data: safeData })
-  return NextResponse.json(product)
+  try {
+    const product = await prisma.product.create({ data: safeData })
+    return NextResponse.json(product)
+  } catch (err: unknown) {
+    const e = err as { message?: string }
+    const msg = typeof e?.message === 'string' ? e.message : ''
+    if (msg.includes('Unknown argument `buyingPrice`') || msg.includes("Unknown argument 'buyingPrice'")) {
+      const { buyingPrice, ...safe } = safeData as Record<string, unknown>
+      // Build a typed create object for Prisma. Use a narrow cast to the expected data shape.
+      const createData = {
+        name: String(safe.name ?? ''),
+        description: String(safe.description ?? ''),
+        price: Number(safe.price ?? 0),
+        category: String(safe.category ?? ''),
+        sku: String(safe.sku ?? ''),
+        stock: Number.isFinite(Number(safe.stock)) ? Number(safe.stock) : 0,
+        isGlobal: Boolean(safe.isGlobal ?? false),
+      }
+      if (buyingPrice !== undefined) {
+        const createDataWithBP = { ...createData, buyingPrice: Number(buyingPrice) } as Parameters<typeof prisma.product.create>[0]['data']
+        const product = await prisma.product.create({ data: createDataWithBP })
+        // If we have buyingPrice, persist it via raw SQL and return the reloaded row
+        const bp = buyingPrice as number | undefined
+        if (bp !== undefined) {
+          try {
+            await prisma.$executeRaw`UPDATE "Product" SET "buyingPrice" = ${bp} WHERE id = ${product.id}`
+            const reloaded = await prisma.product.findUnique({ where: { id: product.id } })
+            return NextResponse.json(reloaded)
+          } catch (rawErr) {
+            console.error('[api] raw buyingPrice update after create failed', rawErr)
+            return NextResponse.json(product)
+          }
+        }
+        return NextResponse.json(product)
+      }
+      const product = await prisma.product.create({ data: createData as Parameters<typeof prisma.product.create>[0]['data'] })
+      // If we have buyingPrice, persist it via raw SQL and return the reloaded row
+      const bp = buyingPrice as number | undefined
+      if (bp !== undefined) {
+        try {
+          await prisma.$executeRaw`UPDATE "Product" SET "buyingPrice" = ${bp} WHERE id = ${product.id}`
+          const reloaded = await prisma.product.findUnique({ where: { id: product.id } })
+          return NextResponse.json(reloaded)
+        } catch (rawErr) {
+          console.error('[api] raw buyingPrice update after create failed', rawErr)
+          return NextResponse.json(product)
+        }
+      }
+      return NextResponse.json(product)
+    }
+    throw err
+  }
 }
 
 export async function PUT(req: Request) {
@@ -72,9 +124,21 @@ export async function PUT(req: Request) {
   const updateData = {
     ...rest,
     ...(rest.stock !== undefined ? { stock: Number.isFinite(rest.stock) ? Number(rest.stock) : 0 } : {}),
+    ...(rest.buyingPrice !== undefined ? { buyingPrice: Number(rest.buyingPrice) || 0 } : {}),
   }
-  const product = await prisma.product.update({ where: { id }, data: updateData })
-  return NextResponse.json(product)
+  try {
+    const product = await prisma.product.update({ where: { id }, data: updateData })
+    return NextResponse.json(product)
+  } catch (err: unknown) {
+    const e = err as { message?: string }
+    const msg = typeof e?.message === 'string' ? e.message : ''
+    if (msg.includes('Unknown argument `buyingPrice`') || msg.includes("Unknown argument 'buyingPrice'")) {
+      const { buyingPrice, ...safeUpdate } = updateData as Record<string, unknown>
+      const product = await prisma.product.update({ where: { id }, data: safeUpdate as unknown as Record<string, unknown> })
+      return NextResponse.json(product)
+    }
+    throw err
+  }
 }
 
 export async function DELETE(req: Request) {

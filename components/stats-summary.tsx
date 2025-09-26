@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { formatCurrency, DEFAULT_CURRENCY } from '@/lib/currency'
+import { useRouter } from "next/navigation"
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select"
 
 interface MonthlyRow {
@@ -135,14 +137,14 @@ export function StatsSummary() {
         <Card>
           <CardHeader>
             <CardTitle>
-              {metricSelection === 'revenue' ? 'Total Revenue' : 'Total Invoices'} (last {monthsSelection}m)
+              {metricSelection === 'revenue' ? `Total Revenue (${DEFAULT_CURRENCY})` : 'Total Invoices'} (last {monthsSelection}m)
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+              <div className="text-2xl font-bold">
               {(() => {
                 const total = monthlyRevenueFixed.reduce((s, r) => s + r.revenue, 0)
-                return metricSelection === 'revenue' ? total.toFixed(2) : String(Math.round(total))
+                return metricSelection === 'revenue' ? formatCurrency(total, DEFAULT_CURRENCY) : String(Math.round(total))
               })()}
             </div>
             <div className="text-sm text-muted-foreground">Sum of invoice line items</div>
@@ -157,7 +159,7 @@ export function StatsSummary() {
             {data.topProducts[0] ? (
               <>
                 <div className="text-lg font-medium">{data.topProducts[0].name}</div>
-                <div className="text-sm text-muted-foreground">Revenue: {data.topProducts[0].revenue.toFixed(2)}</div>
+                <div className="text-sm text-muted-foreground">Revenue: {formatCurrency(data.topProducts[0].revenue, DEFAULT_CURRENCY)}</div>
               </>
             ) : (
               <div className="text-sm text-muted-foreground">No products yet</div>
@@ -173,7 +175,7 @@ export function StatsSummary() {
             {data.topClients[0] ? (
               <>
                 <div className="text-lg font-medium">{data.topClients[0].name}</div>
-                <div className="text-sm text-muted-foreground">Revenue: {data.topClients[0].revenue.toFixed(2)}</div>
+                <div className="text-sm text-muted-foreground">Revenue: {formatCurrency(data.topClients[0].revenue, DEFAULT_CURRENCY)}</div>
               </>
             ) : (
               <div className="text-sm text-muted-foreground">No clients yet</div>
@@ -183,12 +185,15 @@ export function StatsSummary() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Active Sellers</CardTitle>
+            <CardTitle>Top Selling User</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{data.revenueByUser.length}</div>
-            <div className="text-sm text-muted-foreground">Users with revenue</div>
-          </CardContent>
+            <CardContent>
+              {data.revenueByUser[0] ? (
+                <UserLink userId={data.revenueByUser[0].id} name={data.revenueByUser[0].name} count={data.revenueByUser[0].invoiceCount} revenue={data.revenueByUser[0].revenue} />
+              ) : (
+                <div className="text-sm text-muted-foreground">No users yet</div>
+              )}
+            </CardContent>
         </Card>
       </div>
 
@@ -196,7 +201,7 @@ export function StatsSummary() {
         <CardHeader>
           <CardTitle>
             {metricSelection === 'revenue'
-              ? `Monthly Revenue (last ${monthsSelection} months)`
+              ? `Monthly Revenue (${DEFAULT_CURRENCY}) (last ${monthsSelection} months)`
               : `Monthly Invoices (last ${monthsSelection} months)`}
           </CardTitle>
         </CardHeader>
@@ -252,12 +257,30 @@ export function StatsSummary() {
                 style={{ position: 'fixed', left: tooltip.x + 12, top: tooltip.y - 40 }}
               >
                 <div className="font-medium">{tooltip.label}</div>
-                <div>{metricSelection === 'revenue' ? tooltip.value.toFixed(2) : String(Math.round(tooltip.value))}</div>
+                <div>{metricSelection === 'revenue' ? formatCurrency(tooltip.value, DEFAULT_CURRENCY) : String(Math.round(tooltip.value))}</div>
               </div>
             )}
           </div>
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+function UserLink({ userId, name, count, revenue }: { userId: string | null, name: string | null, count: number, revenue: number }) {
+  const router = useRouter()
+  if (!userId) return <div className="text-sm text-muted-foreground">Unknown user</div>
+  return (
+    <button
+      onClick={(e) => {
+        e.preventDefault()
+        // Navigate to the dashboard invoices view and preselect this user via query param
+        router.push(`/dashboard?filterUserId=${encodeURIComponent(userId)}`)
+      }}
+      className="text-left no-underline hover:underline w-full"
+    >
+      <div className="text-lg font-medium">{name || 'Unknown'}</div>
+  <div className="text-sm text-muted-foreground">Invoices: {count} — Revenue: {formatCurrency(revenue, DEFAULT_CURRENCY)}</div>
+    </button>
   )
 }

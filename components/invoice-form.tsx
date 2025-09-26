@@ -22,6 +22,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Loader2, ArrowLeft, Plus, Trash2 } from "lucide-react"
+import { formatCurrency, DEFAULT_CURRENCY } from '@/lib/currency'
 import { toast } from "sonner"
 
 interface InvoiceFormProps {
@@ -32,7 +33,7 @@ interface InvoiceFormProps {
 }
 
 interface LineItemForm {
-  productId: string
+  productId: string | null
   productName: string
   description: string
   quantity: number
@@ -110,6 +111,8 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
   console.debug("InvoiceForm.loadData: products", Array.isArray(productsData) ? productsData.length : typeof productsData)
       setClients(clientsData)
       setProducts(productsData)
+      // When creating a new invoice we do not auto-insert shipping here anymore.
+      // Shipping can be added manually via the "Add Shipping" button.
     } catch {
       toast.error("Error", {
         description: "Failed to load data",
@@ -151,53 +154,24 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
   }
 
   const addLineItem = () => {
-    // Ensure a shipping line item exists as the first row. Prefer a catalog shipping product
-    const hasShipping = lineItems.some((li) => {
-      if (!li) return false
-      if (li.productId === "virtual-shipping") return true
-      const p = products.find((p) => p.id === li.productId)
-      return !!p && ((p.category || "").toLowerCase() === "shipping" || p.name.toLowerCase().includes("shipping"))
-    })
-
-    const newItems = [...lineItems]
-    if (!hasShipping) {
-      const product = products.find((p) => (p.category || "").toLowerCase() === "shipping" || p.name.toLowerCase().includes("shipping"))
-      if (product) {
-        newItems.unshift({
-          productId: product.id,
-          productName: product.name,
-          description: product.description || "Shipping",
-          quantity: 1,
-          unitPrice: product.price,
-        })
-      } else {
-        newItems.unshift({
-          productId: "virtual-shipping",
-          productName: "Shipping",
-          description: "Shipping",
-          quantity: 1,
-          unitPrice: 0,
-        })
-      }
-    }
-
-    // Add the new blank item after shipping (or at end if shipping already exists)
-    newItems.push({
-      productId: "",
-      productName: "",
-      description: "",
-      quantity: 1,
-      unitPrice: 0,
-    })
-
-    setLineItems(newItems)
+    // Add a single blank line item. Do not auto-add shipping here.
+    setLineItems([
+      ...lineItems,
+      {
+        productId: "",
+        productName: "",
+        description: "",
+        quantity: 1,
+        unitPrice: 0,
+      },
+    ])
   }
 
   const removeLineItem = (index: number) => {
     setLineItems(lineItems.filter((_, i) => i !== index))
   }
 
-  const updateLineItem = (index: number, field: keyof LineItemForm, value: string | number) => {
+  const updateLineItem = (index: number, field: keyof LineItemForm, value: string | number | null) => {
     const updated = [...lineItems]
     updated[index] = { ...updated[index], [field]: value }
 
@@ -279,8 +253,8 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
         for (const item of lineItems) {
           if (item.productId) {
             const prod = products.find((p) => p.id === item.productId)
-            if (prod && item.unitPrice < prod.price) {
-              setError(`Unit price for "${item.productName}" cannot be lower than product price (${prod.price.toFixed(2)})`)
+              if (prod && item.unitPrice < prod.price) {
+              setError(`Unit price for "${item.productName}" cannot be lower than product price (${formatCurrency(prod.price, DEFAULT_CURRENCY)})`)
               setLoading(false)
               return
             }
@@ -311,7 +285,7 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
           if (item.productId) {
             const prod = products.find((p) => p.id === item.productId)
             if (prod && item.unitPrice < prod.price) {
-              setError(`Unit price for "${item.productName}" cannot be lower than product price (${prod.price.toFixed(2)})`)
+              setError(`Unit price for "${item.productName}" cannot be lower than product price (${formatCurrency(prod.price, DEFAULT_CURRENCY)})`)
               setLoading(false)
               return
             }
@@ -424,13 +398,18 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-medium">Line Items</h3>
-              <Button type="button" variant="outline" onClick={addLineItem}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Item
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="outline" onClick={addLineItem}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Item
+                </Button>
+                <Button type="button" variant="outline" onClick={addShipping}>
+                  Add Shipping
+                </Button>
+              </div>
             </div>
 
-            {/* Shipping is automatically inserted as the first line item when adding items */}
+            {/* Shipping is inserted by default only when opening the Create Invoice form. Use "Add Shipping" to add it manually. */}
 
             {lineItems.length > 0 && (
               <Table>
@@ -459,8 +438,8 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
 
                           return (
                             <Select
-                              value={item.productId}
-                              onValueChange={(value) => updateLineItem(index, "productId", value)}
+                              value={item.productId ?? ""}
+                              onValueChange={(value) => updateLineItem(index, "productId", value === "" ? null : value)}
                             >
                               <SelectTrigger className="w-full">
                                 <SelectValue placeholder="Select product" />
@@ -471,7 +450,7 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
                                   <SelectItem key={`ship-${product.id}`} value={product.id}>
                                     <div className="flex items-center justify-between w-full">
                                       <span>Shipping</span>
-                                      <span className="text-sm text-muted-foreground">${product.price.toFixed(2)}</span>
+                                      <span className="text-sm text-muted-foreground">{formatCurrency(product.price, DEFAULT_CURRENCY)}</span>
                                     </div>
                                   </SelectItem>
                                 ))}
@@ -521,7 +500,7 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
                           className="w-24"
                         />
                       </TableCell>
-                      <TableCell className="font-medium">${(item.quantity * item.unitPrice).toFixed(2)}</TableCell>
+                      <TableCell className="font-medium">{formatCurrency(item.quantity * item.unitPrice, DEFAULT_CURRENCY)}</TableCell>
                       <TableCell>
                         <Button type="button" variant="outline" size="sm" onClick={() => removeLineItem(index)}>
                           <Trash2 className="h-4 w-4" />
@@ -540,7 +519,7 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
               <div className="w-64 space-y-2">
                 <div className="flex justify-between">
                   <span>Subtotal:</span>
-                  <span>${calculateSubtotal().toFixed(2)}</span>
+                  <span>{formatCurrency(calculateSubtotal(), DEFAULT_CURRENCY)}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <Label htmlFor="taxRate">Tax Rate (%):</Label>
@@ -557,11 +536,11 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
                 </div>
                 <div className="flex justify-between">
                   <span>Tax:</span>
-                  <span>${calculateTax().toFixed(2)}</span>
+                  <span>{formatCurrency(calculateTax(), DEFAULT_CURRENCY)}</span>
                 </div>
                 <div className="flex justify-between font-bold text-lg border-t pt-2">
                   <span>Total:</span>
-                  <span>${calculateTotal().toFixed(2)}</span>
+                  <span>{formatCurrency(calculateTotal(), DEFAULT_CURRENCY)}</span>
                 </div>
               </div>
             </div>

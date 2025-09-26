@@ -152,3 +152,16 @@ npm run lint
 ## 10. License
 
 MIT
+
+---
+
+## Backfill: invoiceItem.buyingPrice
+
+If you added `buyingPrice` to `Product` after creating invoices, existing `InvoiceItem` rows may have `buyingPrice` NULL or 0. Use the helper script to copy current `Product.buyingPrice` into `InvoiceItem.buyingPrice`:
+
+```bash
+node scripts/backfill-invoiceitem-buyingprice.js    # fill only null values
+node scripts/backfill-invoiceitem-buyingprice.js --force  # also overwrite zeros
+```
+
+Run this while your dev server is stopped to avoid concurrency issues.

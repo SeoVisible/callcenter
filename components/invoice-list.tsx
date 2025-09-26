@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import type { Invoice } from "@/lib/invoices"
+import { formatStatusLabel } from '@/lib/status'
 import { invoiceService } from "@/lib/invoices"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
@@ -22,6 +23,9 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent } from "@/components/ui/dropdown-menu"
 import { Plus, Edit, Trash2, Loader2, MoreHorizontal, Send, Eye, CheckCircle } from "lucide-react"
 import { toast } from "sonner"
+import { clientService } from "@/lib/clients"
+import { formatCurrency, DEFAULT_CURRENCY } from '@/lib/currency'
+import { userService } from "@/lib/users"
 
 type InvoiceStatus = "pending" | "maker" | "sent" | "paid" | "not_paid" | "completed" | undefined
 const toInvoiceStatus = (s: unknown): InvoiceStatus => {
@@ -34,22 +38,37 @@ interface InvoiceListProps {
   onAddInvoice: () => void
   onEditInvoice: (invoice: Invoice) => void
   onViewInvoice: (invoice: Invoice) => void
+  // optional pre-filter to show invoices for a specific user (used by per-user page)
+  initialFilterUserId?: string
 }
 
-export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: InvoiceListProps) {
+export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initialFilterUserId }: InvoiceListProps) {
   const { user } = useAuth()
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [query, setQuery] = useState("")
   const [debouncedQuery, setDebouncedQuery] = useState("")
   const [loading, setLoading] = useState(true)
+  const [tableLoading, setTableLoading] = useState(false)
+  const [filterStatus, setFilterStatus] = useState<InvoiceStatus | "">("")
+  const [filterClient, setFilterClient] = useState<string | "">("")
+  const [filterUser, setFilterUser] = useState<string | "">("")
+  const [clients, setClients] = useState<Array<{id:string,name:string}>>([])
+  const [users, setUsers] = useState<Array<{id:string,name:string}>>([])
   const [deleteInvoice, setDeleteInvoice] = useState<Invoice | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [sendingId, setSendingId] = useState<string | null>(null)
   const [markingPaidId, setMarkingPaidId] = useState<string | null>(null)
+  const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null)
 
-  const loadInvoices = async () => {
+  const loadInvoices = async (opts?: { status?: string, sortBy?: string, sortDir?: string, clientId?: string, filterUserId?: string }) => {
     try {
-      const data = await invoiceService.getAllInvoices(user?.id, user?.role)
+      // If this is the initial load (loading flag), keep that behavior. Otherwise show tableLoading.
+      if (!loading) setTableLoading(true)
+      // prefer explicit opts -> component state -> initialFilterUserId
+      const statusParam = opts?.status ?? (filterStatus ? String(filterStatus) : undefined)
+      const clientParam = opts?.clientId ?? (filterClient ? String(filterClient) : undefined)
+      const filterUserId = opts?.filterUserId ?? (filterUser ? String(filterUser) : initialFilterUserId)
+      const data = await invoiceService.getAllInvoices(user?.id, user?.role, statusParam, opts?.sortBy, opts?.sortDir, clientParam, filterUserId)
       setInvoices(data)
     } catch {
       // Log to console to aid debugging in dev. The UI shows a toast too.
@@ -57,12 +76,65 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
       toast.error("Failed to load invoices")
     } finally {
       setLoading(false)
+      setTableLoading(false)
     }
   }
 
   useEffect(() => {
-    loadInvoices()
+    // On initial mount, load invoices and pass initialFilterUserId if present
+    loadInvoices({ filterUserId: initialFilterUserId })
+    // If an initial user filter was provided (from per-user page), set the select value so it appears selected
+    if (initialFilterUserId) {
+      setFilterUser(initialFilterUserId)
+    }
+    // load clients and users for filters
+    ;(async () => {
+      try {
+        const cs = await clientService.getAllClients()
+        setClients(cs.map(c => ({ id: c.id, name: c.name })))
+      } catch (e) {
+        // ignore
+      }
+      try {
+        const us = await userService.getAllUsers()
+        setUsers(us.map(u => ({ id: u.id, name: u.name })))
+      } catch (e) {
+        // ignore
+      }
+    })()
   }, [user])
+
+  // Auto-apply filters when status changes (debounced)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      void applyFilters()
+    }, 250)
+    return () => clearTimeout(t)
+  }, [filterStatus])
+
+  // Auto-apply filters when client or user select changes (debounced)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      void applyFilters()
+    }, 250)
+    return () => clearTimeout(t)
+  }, [filterClient, filterUser])
+
+  const applyFilters = async () => {
+    setTableLoading(true)
+    try {
+      const statusParam = filterStatus ? String(filterStatus) : undefined
+  const clientParam = filterClient ? String(filterClient) : undefined
+  const userParam = filterUser ? String(filterUser) : undefined
+  // pass caller's user id/role as the auth context, and clientParam and userParam as explicit filters
+  const data = await invoiceService.getAllInvoices(user?.id, user?.role, statusParam, undefined, undefined, clientParam, userParam)
+      setInvoices(data)
+    } catch {
+      toast.error('Failed to apply filters')
+    } finally {
+      setTableLoading(false)
+    }
+  }
 
   // debounce the query to avoid frequent re-renders while typing
   useEffect(() => {
@@ -161,20 +233,16 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
     if (!status) {
       return <Badge variant="secondary" className="bg-gray-100 text-gray-800">Unknown</Badge>
     }
+    // Format status label (handle underscores like not_paid -> Not Paid)
+    const label = typeof status === 'string' ? formatStatusLabel(status) : 'Unknown'
     return (
       <Badge variant={variants[status]} className={colors[status]}>
-        {typeof status === 'string' ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown'}
+        {label}
       </Badge>
     )
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    )
-  }
+  // Render UI immediately and show inline loading states (skeletons) instead
 
   return (
     <>
@@ -186,20 +254,51 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
               {user?.role === "superadmin" ? "Manage all invoices in the system" : "Manage your invoices"}
             </p>
           </div>
-          <Button onClick={onAddInvoice}>
+          <div className="flex items-center gap-2">
+            {loading ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : null}
+            <Button onClick={onAddInvoice} disabled={loading}>
             <Plus className="mr-2 h-4 w-4" />
             Create Invoice
-          </Button>
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="mb-4">
+          <div className="mb-4 flex items-center gap-2">
             <Input
               placeholder="Search invoices by number, client, user, id or status..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
+            <div className="w-48">
+              <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as InvoiceStatus | "")} className="w-full rounded-lg border px-3 py-2">
+                <option value="">All statuses</option>
+                <option value="pending">Pending</option>
+                <option value="maker">Maker</option>
+                <option value="sent">Sent</option>
+                <option value="paid">Paid</option>
+                <option value="not_paid">Not Paid</option>
+                <option value="completed">Completed</option>
+              </select>
+            </div>
+            <div className="w-48">
+              <select value={filterClient} onChange={(e) => setFilterClient(e.target.value)} className="w-full rounded-lg border px-3 py-2">
+                <option value="">All clients</option>
+                {clients.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="w-48">
+              <select value={filterUser} onChange={(e) => setFilterUser(e.target.value)} className="w-full rounded-lg border px-3 py-2">
+                <option value="">All users</option>
+                {users.map(u => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </select>
+            </div>
+            {/* status select only; removed sort selects for a cleaner UI */}
           </div>
-          <Table>
+            <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Invoice #</TableHead>
@@ -213,7 +312,22 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredInvoices.map((invoice) => (
+              {loading ? (
+                // Render 6 skeleton rows while loading
+                Array.from({ length: 6 }).map((_, i) => (
+                  <TableRow key={`skeleton-${i}`}>
+                    <TableCell><div className="h-4 bg-gray-200 rounded w-32 animate-pulse" /></TableCell>
+                    <TableCell><div className="h-4 bg-gray-200 rounded w-48 animate-pulse" /></TableCell>
+                    <TableCell><div className="h-4 bg-gray-200 rounded w-32 animate-pulse" /></TableCell>
+                    <TableCell><div className="h-4 bg-gray-200 rounded w-20 animate-pulse" /></TableCell>
+                    <TableCell><div className="h-4 bg-gray-200 rounded w-24 animate-pulse" /></TableCell>
+                    <TableCell><div className="h-4 bg-gray-200 rounded w-24 animate-pulse" /></TableCell>
+                    <TableCell><div className="h-4 bg-gray-200 rounded w-24 animate-pulse" /></TableCell>
+                    <TableCell className="text-right"><div className="h-4 bg-gray-200 rounded w-16 ml-auto animate-pulse" /></TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                filteredInvoices.map((invoice) => (
                 <TableRow key={invoice.id}>
                   <TableCell>
                     <div className="font-mono text-sm">{invoice.id}</div>
@@ -229,7 +343,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
                     <div className="text-sm">{invoice.userName}</div>
                   </TableCell>
                   <TableCell>
-                    <div className="font-medium">${typeof invoice.total === 'number' ? invoice.total.toFixed(2) : '0.00'}</div>
+                    <div className="font-medium">{typeof invoice.total === 'number' ? formatCurrency(invoice.total, DEFAULT_CURRENCY) : formatCurrency(0, DEFAULT_CURRENCY)}</div>
                   </TableCell>
                   <TableCell>{getStatusBadge(invoice.status)}</TableCell>
                   <TableCell>{new Date(invoice.createdAt).toLocaleDateString()}</TableCell>
@@ -299,7 +413,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
                                 doc.text(`invoice-${invoice.id}`, 14, 26);
                                 doc.setTextColor(0);
                                 doc.setFontSize(11);
-                                doc.text(`Status: ${invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}`, 150, 18, { align: "right" });
+                              doc.text(`Status: ${formatStatusLabel(invoice.status)}`, 150, 18, { align: "right" });
                                 doc.text(`Created: ${new Date(invoice.createdAt).toLocaleDateString()}`, 150, 26, { align: "right" });
                                 doc.text(`Due: ${new Date(invoice.dueDate).toLocaleDateString()}`, 150, 34, { align: "right" });
 
@@ -320,8 +434,8 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
                                   body: invoice.lineItems.map(item => [
                                     item.productName + (item.description ? `\n${item.description}` : ""),
                                     item.quantity,
-                                    `$${item.unitPrice.toFixed(2)}`,
-                                    `$${item.total.toFixed(2)}`
+                                    formatCurrency(item.unitPrice, DEFAULT_CURRENCY),
+                                    formatCurrency(item.total, DEFAULT_CURRENCY)
                                   ]),
                                   headStyles: { fillColor: [40, 40, 80], textColor: 255, fontStyle: 'bold' },
                                   bodyStyles: { fontSize: 10 },
@@ -334,13 +448,13 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
                                 doc.setFontSize(11);
                                 doc.setTextColor(40, 40, 80);
                                 doc.text(`Subtotal:`, 130, finalY + 10);
-                                doc.text(`$${invoice.subtotal.toFixed(2)}`, 180, finalY + 10, { align: "right" });
+                                doc.text(formatCurrency(invoice.subtotal, DEFAULT_CURRENCY), 180, finalY + 10, { align: "right" });
                                 doc.text(`Tax (${invoice.taxRate}%):`, 130, finalY + 18);
-                                doc.text(`$${invoice.taxAmount.toFixed(2)}`, 180, finalY + 18, { align: "right" });
+                                doc.text(formatCurrency(invoice.taxAmount, DEFAULT_CURRENCY), 180, finalY + 18, { align: "right" });
                                 doc.setFont("helvetica", "bold");
                                 doc.setFontSize(13);
                                 doc.text(`Total:`, 130, finalY + 28);
-                                doc.text(`$${invoice.total.toFixed(2)}`, 180, finalY + 28, { align: "right" });
+                                doc.text(formatCurrency(invoice.total, DEFAULT_CURRENCY), 180, finalY + 28, { align: "right" });
                                 doc.setFont("helvetica", "normal");
                                 doc.setFontSize(11);
                                 doc.setTextColor(0);
@@ -374,7 +488,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
                                 doc.text(`invoice-${invoice.id}`, 14, 26);
                                 doc.setTextColor(0);
                                 doc.setFontSize(11);
-                                doc.text(`Status: ${invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}`, 150, 18, { align: "right" });
+                                doc.text(`Status: ${formatStatusLabel(invoice.status)}`, 150, 18, { align: "right" });
                                 doc.text(`Created: ${new Date(invoice.createdAt).toLocaleDateString()}`, 150, 26, { align: "right" });
                                 doc.text(`Due: ${new Date(invoice.dueDate).toLocaleDateString()}`, 150, 34, { align: "right" });
 
@@ -456,12 +570,21 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
                           <div className="px-2 text-xs text-muted-foreground">Change status</div>
                           {['pending','maker','sent','paid','not_paid','completed'].map((s) => (
                             <DropdownMenuItem key={s} onClick={async () => {
+                              const newStatus = toInvoiceStatus(s)
+                              if (!newStatus) return
+                              // optimistic update: update state immediately, call API, revert on failure
+                              const prev = invoices
                               try {
-                                await invoiceService.updateInvoice(invoice.id, { status: toInvoiceStatus(s) })
+                                setInvoices(prev.map(i => i.id === invoice.id ? { ...i, status: newStatus } : i))
+                                setUpdatingStatusId(invoice.id)
+                                await invoiceService.updateInvoice(invoice.id, { status: newStatus })
                                 toast.success(`Status updated to ${s}`)
-                                loadInvoices()
                               } catch (err) {
+                                // revert
+                                setInvoices(prev)
                                 toast.error(err instanceof Error ? err.message : 'Failed to update status')
+                              } finally {
+                                setUpdatingStatusId(null)
                               }
                             }}>
                               {s.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
@@ -472,7 +595,8 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice }: Invo
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+                ))
+              )}
             </TableBody>
           </Table>
           {invoices.length === 0 && (

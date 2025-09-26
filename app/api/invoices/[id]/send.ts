@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
 // @ts-expect-error: nodemailer has no types for ESM import
 import nodemailer from "nodemailer"
+import { formatCurrency, DEFAULT_CURRENCY } from '../../../../lib/currency'
 
 const prisma = new PrismaClient()
 
@@ -35,14 +36,14 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const total = subtotal + taxAmount
     // Compose email
     const itemsHtml = invoice.lineItems.map(item =>
-      `<tr><td>${item.productName}</td><td>${item.quantity}</td><td>${item.unitPrice}</td></tr>`
+      `<tr><td>${item.productName}</td><td>${item.quantity}</td><td>${formatCurrency(item.unitPrice, DEFAULT_CURRENCY)}</td></tr>`
     ).join("")
     const html = `
       <h2>Invoice #${invoice.id}</h2>
       <p>Dear ${invoice.client.name},</p>
       <p>Here is your invoice from ${invoice.client.company || "our company"}.</p>
       <table border="1" cellpadding="5"><tr><th>Product</th><th>Qty</th><th>Unit Price</th></tr>${itemsHtml}</table>
-      <p>Total: <b>${total.toFixed(2)}</b></p>
+      <p>Total: <b>${formatCurrency(total, DEFAULT_CURRENCY)}</b></p>
     `
 
     const info = await transporter.sendMail({

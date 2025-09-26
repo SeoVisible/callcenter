@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useSearchParams } from 'next/navigation'
 import { ProtectedRoute } from "@/components/protected-route"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { UserList } from "@/components/user-list"
@@ -14,6 +15,7 @@ import { InvoiceForm } from "@/components/invoice-form"
 import { InvoiceView } from "@/components/invoice-view"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { DashboardHome } from "@/components/dashboard-home"
+import dynamic from 'next/dynamic'
 import { useAuth } from "@/contexts/auth-context"
 import type { User } from "@/lib/auth"
 import type { Product } from "@/lib/products"
@@ -22,12 +24,15 @@ import type { Invoice } from "@/lib/invoices"
 // Icons imported previously but unused in this file were removed to satisfy lint
 
 export default function DashboardPage() {
+  const searchParams = useSearchParams()
+  const paramFilterUserId = searchParams?.get('filterUserId') ?? undefined
   const { user } = useAuth()
-  const [activeSection, setActiveSection] = useState("dashboard")
+  const [activeSection, setActiveSection] = useState(paramFilterUserId ? "invoices" : "dashboard")
   const [showUserForm, setShowUserForm] = useState(false)
   const [editingUser, setEditingUser] = useState<User | undefined>()
   const [showProductForm, setShowProductForm] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | undefined>()
+  const [showStatsProductId, setShowStatsProductId] = useState<string | undefined>()
   const [showClientForm, setShowClientForm] = useState(false)
   const [editingClient, setEditingClient] = useState<Client | undefined>()
   const [showInvoiceForm, setShowInvoiceForm] = useState(false)
@@ -75,6 +80,15 @@ export default function DashboardPage() {
     setShowProductForm(false)
     setEditingProduct(undefined)
   }
+
+  const handleShowProductStats = (id: string) => {
+    setShowStatsProductId(id)
+    // ensure product form isn't visible
+    setShowProductForm(false)
+    setEditingProduct(undefined)
+  }
+
+  const handleCloseProductStats = () => setShowStatsProductId(undefined)
 
   // Client management handlers
   const handleAddClient = () => {
@@ -160,7 +174,12 @@ export default function DashboardPage() {
           />
         )
       }
-      return <ProductList onAddProduct={handleAddProduct} onEditProduct={handleEditProduct} />
+      if (showStatsProductId) {
+        // render stats panel inline via dynamic import (avoid require())
+        const ProductStatsPanel = dynamic(() => import('@/components/product-stats-panel').then(m => m.ProductStatsPanel), { ssr: false })
+        return <ProductStatsPanel id={showStatsProductId} onClose={handleCloseProductStats} />
+      }
+      return <ProductList onAddProduct={handleAddProduct} onEditProduct={handleEditProduct} onShowStats={handleShowProductStats} />
     }
 
     // Client Management
@@ -179,7 +198,7 @@ export default function DashboardPage() {
     }
 
     // Invoice Management
-    if (activeSection === "invoices") {
+  if (activeSection === "invoices") {
       if (viewingInvoice) {
         return <InvoiceView invoice={viewingInvoice} onBack={handleInvoiceViewBack} onEdit={handleInvoiceViewEdit} />
       }
@@ -197,6 +216,7 @@ export default function DashboardPage() {
           onAddInvoice={handleAddInvoice}
           onEditInvoice={handleEditInvoice}
           onViewInvoice={handleViewInvoice}
+          initialFilterUserId={paramFilterUserId}
         />
       )
     }
@@ -204,6 +224,12 @@ export default function DashboardPage() {
     // Default dashboard view: show DashboardHome (graphs/statistics)
     return <DashboardHome />
   }
+
+  // If the URL contains a filterUserId param (e.g. via /dashboard?filterUserId=...),
+  // ensure the invoices tab is selected when the param appears or changes.
+  useEffect(() => {
+    if (paramFilterUserId) setActiveSection("invoices")
+  }, [paramFilterUserId])
 
   return (
     <ProtectedRoute>

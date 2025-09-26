@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from "next/server"
 import { PrismaClient, Invoice as PrismaInvoice, InvoiceItem as PrismaInvoiceItem, Client as PrismaClientType } from "@prisma/client"
 
@@ -33,15 +34,43 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const userId = searchParams.get("userId")
   const userRole = searchParams.get("userRole")
+  const statusParam = searchParams.get("status") // can be single value or comma-separated
+  const clientIdParam = searchParams.get("clientId")
+  const filterUserId = searchParams.get("filterUserId")
+  const sortBy = searchParams.get("sortBy") || "createdAt" // createdAt | status
+  const sortDir = (searchParams.get("sortDir") || "desc").toLowerCase() === "asc" ? "asc" : "desc"
 
-  let where = {}
+  let where: any = {}
+  // If caller is not superadmin, restrict to their invoices
   if (userRole !== "superadmin" && userId) {
     where = { createdBy: userId }
+  }
+  // If an explicit filterUserId param was provided, use it (overrides caller context if superadmin)
+  if (filterUserId) {
+    where = { ...where, createdBy: filterUserId }
+  }
+  // Filter by client if provided
+  if (clientIdParam) {
+    where = { ...where, clientId: clientIdParam }
+  }
+  // Filter by status if provided (allow comma-separated list)
+  if (statusParam) {
+    const statuses = statusParam.split(',').map(s => s.trim()).filter(Boolean)
+    if (statuses.length === 1) where = { ...where, status: statuses[0] }
+    else if (statuses.length > 1) where = { ...where, status: { in: statuses } }
+  }
+
+  // Determine ordering
+  const orderBy: any = {}
+  if (sortBy === "status") {
+    orderBy.status = sortDir as "asc" | "desc"
+  } else {
+    orderBy.createdAt = sortDir as "asc" | "desc"
   }
 
   const invoices = await prisma.invoice.findMany({
     where,
-    orderBy: { createdAt: "desc" },
+    orderBy,
     include: { lineItems: true, client: true, user: true }
   })
   // Add computed totals, client fields, and user fields to each invoice
@@ -91,7 +120,9 @@ export async function POST(req: Request) {
     if (productIds.length > 0) {
       const products = await prisma.product.findMany({ where: { id: { in: productIds } }, select: { id: true, price: true } });
       const priceById: Record<string, number> = {};
-      for (const p of products) priceById[p.id] = Number(p.price ?? 0);
+      for (const p of products) {
+        priceById[p.id] = Number(p.price ?? 0);
+      }
 
       for (const li of data.lineItems) {
         const minPrice = priceById[String(li.productId)] ?? 0;
@@ -101,31 +132,109 @@ export async function POST(req: Request) {
       }
   }
 
-  // Prepare lineItems for nested create
-    const lineItems = data.lineItems.map((item: { productId: string, productName: string, description: string, quantity: number, unitPrice: number }) => ({
-      productId: item.productId,
+    // Prepare lineItems for nested create
+    type LineItemInput = { productId?: string | null, productName: string, description?: string | null, quantity: number, unitPrice: number }
+    const lineItems: LineItemInput[] = (data.lineItems as LineItemInput[]).map((item: LineItemInput) => ({
+      productId: item.productId ?? null,
       productName: item.productName,
-      description: item.description,
-      quantity: item.quantity,
-      unitPrice: item.unitPrice,
+      description: item.description ?? null,
+      quantity: Number(item.quantity),
+      unitPrice: Number(item.unitPrice),
     }));
+    // Validate stock availability and create invoice while decrementing stock atomically
+    // Fetch current stocks for products involved
+  const productIdsInInvoice = Array.from(new Set(lineItems.map((li: LineItemInput) => li.productId).filter(Boolean))) as string[];
+  // fetch category so we can treat 'shipping' products as exempt from stock changes
+  const products = await prisma.product.findMany({ where: { id: { in: productIdsInInvoice as string[] } }, select: { id: true, stock: true, category: true, buyingPrice: true } });
+    // Build a map only for non-shipping products that exist in the DB. Shipping products are exempt
+    // from stock validation/updates, even if they exist in the catalog.
+    const stockById: Record<string, number> = {}
+    for (const p of products) {
+      const isShipping = ((p.category || "").toLowerCase() === "shipping")
+      if (!isShipping) stockById[p.id] = Number(p.stock ?? 0)
+    }
 
-    // Create invoice with nested lineItems
-    const invoice = await prisma.invoice.create({
-      data: {
-        clientId: data.clientId,
-        createdBy: data.createdBy,
-        dueDate: new Date(data.dueDate),
-        taxRate: data.taxRate,
-        notes: data.notes,
-        status: "pending",
-        lineItems: {
-          create: lineItems
+    // Check if any real (non-shipping) product line item would result in negative stock.
+    // Skip items whose productId is not present in stockById (virtual items or shipping products).
+    for (const li of lineItems) {
+      // productId may be null for virtual items; skip those
+      if (!li.productId) continue
+      if (!Object.prototype.hasOwnProperty.call(stockById, li.productId)) {
+        // product not found in DB (virtual/shipping/etc.) - skip stock validation
+        continue
+      }
+      const id = li.productId as string
+      const available = stockById[id]
+      if (li.quantity > available) {
+        return NextResponse.json({ error: `Insufficient stock for product ${id}. Available: ${available}, required: ${li.quantity}` }, { status: 400 })
+      }
+      // decrement local copy for further checks of same product
+      stockById[id] = available - li.quantity
+    }
+
+    // Run a transaction: create invoice with nested line items and update product stocks
+      const txResult = await prisma.$transaction(async (prismaTx) => {
+        // For nested create: if product exists in DB, connect by id; otherwise set productId=null
+        const productsById = Object.fromEntries(products.map(p => [p.id, p]))
+        const createLineItems = lineItems.map((li) => {
+          const exists = li.productId && Object.prototype.hasOwnProperty.call(productsById, li.productId)
+          if (exists) {
+            // connect to existing product
+            const prod = productsById[li.productId as string]
+            const bp = Number((prod as any)?.buyingPrice ?? 0)
+            return {
+              product: { connect: { id: li.productId } },
+              productName: li.productName,
+              description: li.description,
+              quantity: li.quantity,
+              unitPrice: li.unitPrice,
+              buyingPrice: bp,
+            }
+          }
+          // virtual item: omit product/productId so the created InvoiceItem will have productId = NULL
+          return {
+            productName: li.productName,
+            description: li.description,
+            quantity: li.quantity,
+            unitPrice: li.unitPrice,
+          }
+        })
+
+        const createdInvoice = await prismaTx.invoice.create({
+          data: {
+            clientId: data.clientId,
+            createdBy: data.createdBy,
+            dueDate: new Date(data.dueDate),
+            taxRate: data.taxRate,
+            notes: data.notes,
+            status: "pending",
+            lineItems: {
+              // cast to any to avoid TS type mismatch when Prisma Client hasn't been regenerated yet
+              create: createLineItems as any
+            }
+          },
+          include: { lineItems: true, client: true }
+        })
+
+        // Update product stocks for existing products only
+        for (const prodId of Object.keys(stockById)) {
+          await prismaTx.product.update({ where: { id: prodId }, data: { stock: stockById[prodId] } })
         }
-      },
-      include: { lineItems: true, client: true }
-    });
-    const { subtotal, taxAmount, total, lineItemsWithTotal } = computeTotals(invoice);
+
+        return createdInvoice
+      })
+  const invoice = txResult as any
+  // include buyingPrice in lineItems totals and profit
+  const lineItemsAugmented = (invoice.lineItems || []).map((item: any) => ({
+    ...item,
+    total: Number(item.unitPrice) * Number(item.quantity),
+    buyingPrice: Number(item.buyingPrice ?? 0),
+    profit: (Number(item.unitPrice) - Number(item.buyingPrice ?? 0)) * Number(item.quantity),
+  }))
+  const subtotal = lineItemsAugmented.reduce((sum: number, it: any) => sum + it.total, 0)
+  const taxAmount = subtotal * (Number(invoice.taxRate) / 100)
+  const total = subtotal + taxAmount
+  const lineItemsWithTotal = lineItemsAugmented
     return NextResponse.json(addClientFields({ ...invoice, subtotal, taxAmount, total, lineItems: lineItemsWithTotal }));
   } catch (err: unknown) {
     const message = err && typeof err === 'object' && 'message' in err ? (err as { message?: string }).message : undefined;

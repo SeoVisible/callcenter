@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client"
 
 import type { Invoice } from "@/lib/invoices"
@@ -12,7 +13,9 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { invoiceService } from "@/lib/invoices"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
+import { formatCurrency, DEFAULT_CURRENCY } from '@/lib/currency'
 import { toast } from "sonner"
+import { formatStatusLabel } from '@/lib/status'
 
 const toInvoiceStatus = (s: unknown) => {
   const v = String(s)
@@ -38,98 +41,185 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
       completed: "bg-teal-100 text-teal-800",
     }
 
-    const label = typeof status === 'string' ? status.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : 'Unknown'
+    const label = typeof status === 'string' ? formatStatusLabel(status) : 'Unknown'
     return <Badge className={colors[status] ?? 'bg-gray-100 text-gray-800'}>{label}</Badge>
   }
 
-  const generatePdf = (opts: { showPrices: boolean }) => {
+  const generatePdf = async (opts: { showPrices: boolean }) => {
     const { showPrices } = opts;
-    const doc = new jsPDF();
-    // Header
-    doc.setFontSize(22);
-    doc.setTextColor(40, 40, 80);
-    doc.text(`INVOICE`, 14, 18);
-    doc.setFontSize(12);
-    doc.setTextColor(100);
-    doc.text(`invoice-${invoice.id}`, 14, 26);
-    doc.setTextColor(0);
-    doc.setFontSize(11);
-    doc.text(`Status: ${invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}`, 150, 18, { align: "right" });
-    doc.text(`Created: ${new Date(invoice.createdAt).toLocaleDateString()}`, 150, 26, { align: "right" });
-    doc.text(`Due: ${new Date(invoice.dueDate).toLocaleDateString()}`, 150, 34, { align: "right" });
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
 
-    // Bill To
-    doc.setFontSize(13);
-    doc.setTextColor(40, 40, 80);
-    doc.text("Bill To:", 14, 42);
-    doc.setFontSize(11);
-    doc.setTextColor(0);
-    doc.text(invoice.clientName, 14, 48);
-    if (invoice.clientCompany) doc.text(invoice.clientCompany, 14, 54);
-    if (invoice.clientEmail) doc.text(invoice.clientEmail, 14, 60);
-
-    // Table columns differ depending on whether prices are shown
-    const head = showPrices ? ["Description", "Qty", "Unit Price", "Total"] : ["Description", "Qty"];
-    const body = invoice.lineItems.map(item => {
-      if (showPrices) {
-        return [
-          item.productName + (item.description ? `\n${item.description}` : ""),
-          item.quantity,
-          `$${item.unitPrice.toFixed(2)}`,
-          `$${item.total.toFixed(2)}`
-        ]
+    // Try to load a logo from /nifar_logo.jpg (public) using fetch->blob->dataURL
+    // This is more reliable than Image + canvas for local dev and avoids CORS issues.
+    let logoDataUrl: string | null = null
+    try {
+      const resp = await fetch('/nifar_logo.jpg')
+      if (resp.ok) {
+        const blob = await resp.blob()
+        logoDataUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader()
+          reader.onloadend = () => resolve(String(reader.result ?? ''))
+          reader.readAsDataURL(blob)
+        })
       }
-      return [
-        item.productName + (item.description ? `\n${item.description}` : ""),
-        item.quantity
-      ]
+    } catch (e) {
+      logoDataUrl = null
+    }
+
+    // Header: logo left, company info right
+    const leftX = 40
+    const rightX = 420
+    const yBase = 40
+    if (logoDataUrl) {
+      try {
+        doc.addImage(logoDataUrl, 'PNG', leftX, yBase - 8, 120, 40)
+      } catch (e) {
+        doc.setFontSize(18)
+        doc.text('Company', leftX, yBase + 12)
+      }
+    } else {
+      doc.setFontSize(18)
+      doc.text('Company', leftX, yBase + 12)
+    }
+
+    doc.setFontSize(10)
+    doc.text('Kompakt GmbH', rightX, yBase)
+    doc.text('Josef-Schrögel-Str. 68', rightX, yBase + 12)
+    doc.text('52349 Düren', rightX, yBase + 24)
+    doc.text('Tel: 02421 / 95 90 176', rightX, yBase + 36)
+    doc.text('info@kompakt-arbeitsschutz.de', rightX, yBase + 48)
+
+  // Title: render main label
+  doc.setFontSize(20)
+  doc.setTextColor(40, 40, 80)
+  doc.text('Rechnung', leftX, yBase + 80)
+
+  // Invoice identifier: place near company block (top-right)
+  const idText = String(invoice.invoiceNumber || invoice.id || '')
+  doc.setFontSize(10)
+  doc.setTextColor(80)
+  const idMaxWidth = 240
+  const idLines = typeof (doc as any).splitTextToSize === 'function' ? (doc as any).splitTextToSize(idText, idMaxWidth) : [idText]
+  doc.text(idLines, rightX, yBase + 70)
+
+    // Client (left) and Invoice meta (right)
+  const clientY = yBase + 120
+    doc.setFontSize(11)
+    doc.setTextColor(0)
+    doc.text('Rechnung an:', leftX, clientY)
+    doc.setFontSize(10)
+    doc.text(invoice.clientName || '', leftX, clientY + 14)
+    if (invoice.clientCompany) doc.text(invoice.clientCompany, leftX, clientY + 28)
+    if (invoice.clientEmail) doc.text(invoice.clientEmail, leftX, clientY + 42)
+
+    const metaX = 360
+    doc.setFontSize(10)
+    // Use safe date handling: prefer issueDate, fall back to createdAt; show empty if invalid
+    const safeDate = (d: any) => {
+      try {
+        const dt = new Date(d)
+        if (isNaN(dt.getTime())) return ''
+        return dt.toLocaleDateString()
+      } catch { return '' }
+    }
+    const invoiceDate = safeDate(invoice.issueDate ?? invoice.createdAt)
+    const serviceDate = safeDate(invoice.createdAt)
+    const dueDate = safeDate(invoice.dueDate)
+    if (invoiceDate) doc.text(`Rechnungsdatum: ${invoiceDate}`, metaX, clientY)
+    if (serviceDate) doc.text(`Leistungsdatum: ${serviceDate}`, metaX, clientY + 14)
+    if (dueDate) doc.text(`Fälligkeitsdatum: ${dueDate}`, metaX, clientY + 28)
+
+    // Items table
+    const head = showPrices ? ['Menge', 'Art.Nr.', 'Bezeichnung', 'Einzelpreis', 'Gesamt'] : ['Menge', 'Art.Nr.', 'Bezeichnung']
+    const body = invoice.lineItems.map((item) => {
+      const sku = (item as any).sku || ''
+      const qty = Number(item.quantity ?? 0)
+      const unit = Number(item.unitPrice ?? 0)
+      const lineTotal = qty * unit
+      if (showPrices) {
+        return [String(qty), sku, item.productName + (item.description ? `\n${item.description}` : ''), formatCurrency(unit, DEFAULT_CURRENCY), formatCurrency(lineTotal, DEFAULT_CURRENCY)]
+      }
+      return [String(qty), sku, item.productName + (item.description ? `\n${item.description}` : '')]
     })
 
     autoTable(doc, {
-      startY: 70,
+      startY: clientY + 80,
       head: [head],
       body,
-      headStyles: { fillColor: [40, 40, 80], textColor: 255, fontStyle: 'bold' },
-      bodyStyles: { fontSize: 10 },
-      alternateRowStyles: { fillColor: [245, 245, 255] },
-      styles: { cellPadding: 2 },
-    });
+  headStyles: { fillColor: [245, 245, 245], textColor: 40, fontStyle: 'bold' },
+  styles: { cellPadding: 6, overflow: 'linebreak' },
+      columnStyles: {
+        0: { cellWidth: 50, halign: 'right' },
+        1: { cellWidth: 60, halign: 'left' },
+        2: { cellWidth: 260 },
+        3: { cellWidth: 80, halign: 'right' },
+        4: { cellWidth: 80, halign: 'right' }
+      },
+      bodyStyles: { fontSize: 10, valign: 'middle' }
+    })
 
-  const finalY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || 100;
-    // Totals (only show when prices are included)
+    const finalY = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || (clientY + 180)
+
+    // Totals box on the right: compute totals from line items (avoid relying on possibly-mismatched invoice fields)
     if (showPrices) {
-      doc.setFontSize(11);
-      doc.setTextColor(40, 40, 80);
-      doc.text(`Subtotal:`, 130, finalY + 10);
-      doc.text(`$${invoice.subtotal.toFixed(2)}`, 180, finalY + 10, { align: "right" });
-      doc.text(`Tax (${invoice.taxRate}%):`, 130, finalY + 18);
-      doc.text(`$${invoice.taxAmount.toFixed(2)}`, 180, finalY + 18, { align: "right" });
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(13);
-      doc.text(`Total:`, 130, finalY + 28);
-      doc.text(`$${invoice.total.toFixed(2)}`, 180, finalY + 28, { align: "right" });
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(11);
-      doc.setTextColor(0);
+      const totalsX = 360
+      let line1Y = finalY + 28 // give a bit more breathing room
+      const lineGap = 16
+
+      // If there isn't enough space on the current page for totals, add a new page and reset Y
+      const pageHeight = typeof (doc as any).internal.pageSize.getHeight === 'function'
+        ? (doc as any).internal.pageSize.getHeight()
+        : (doc as any).internal.pageSize.height
+      const bottomMargin = 60
+      const estimatedTotalsHeight = 80
+      if (line1Y + estimatedTotalsHeight > pageHeight - bottomMargin) {
+        doc.addPage()
+        // place totals near top on new page
+        line1Y = 60
+      }
+
+      // compute subtotal from invoice.lineItems to avoid duplication errors
+      const computedSubtotal = invoice.lineItems.reduce((s, it) => s + (Number(it.unitPrice ?? 0) * Number(it.quantity ?? 0)), 0)
+      const taxRateNum = Number(invoice.taxRate ?? 0)
+      const computedTax = computedSubtotal * (taxRateNum / 100)
+      const computedTotal = computedSubtotal + computedTax
+
+      doc.setFontSize(10)
+      doc.setTextColor(40)
+      // Netto
+      doc.setFont('helvetica', 'normal')
+      doc.text('Gesamt Netto:', totalsX, line1Y)
+      doc.text(formatCurrency(computedSubtotal, DEFAULT_CURRENCY), totalsX + 120, line1Y, { align: 'right' })
+
+      // Tax
+      doc.text(`Umsatzsteuer (${taxRateNum}%):`, totalsX, line1Y + lineGap)
+      doc.text(formatCurrency(computedTax, DEFAULT_CURRENCY), totalsX + 120, line1Y + lineGap, { align: 'right' })
+
+      // Brutto (bold) - draw once
+      doc.setFontSize(12)
+      doc.setFont('helvetica', 'bold')
+      const bruttoY = line1Y + lineGap * 2 + 8
+      doc.text('Gesamt Brutto:', totalsX, bruttoY)
+      doc.text(formatCurrency(computedTotal, DEFAULT_CURRENCY), totalsX + 120, bruttoY, { align: 'right' })
+      doc.setFont('helvetica', 'normal')
     }
 
-    // Notes
-    if (invoice.notes) {
-      doc.setFontSize(11);
-      doc.setTextColor(40, 40, 80);
-      doc.text("Notes:", 14, finalY + 40);
-      doc.setFontSize(10);
-      doc.setTextColor(80);
-      doc.text(invoice.notes, 14, finalY + 48, { maxWidth: 180 });
-      doc.setTextColor(0);
-    }
+    // Footer with bank/contact info
+    const footerY = 780
+    doc.setFontSize(9)
+    doc.setTextColor(100)
+    doc.text('Kompakt GmbH — Josef-Schrögel-Str. 68, 52349 Düren — DE89 3700 0400 0289 5220 00', 40, footerY)
+    doc.text('info@kompakt-arbeitsschutz.de — Tel: 02421 / 95 90 176', 40, footerY + 12)
 
-    const filename = showPrices ? `invoice-${invoice.id}.pdf` : `invoice-${invoice.id}-no-prices.pdf`;
-    doc.save(filename);
+  const filename = showPrices ? `invoice-${invoice.id}.pdf` : `invoice-${invoice.id}-no-prices.pdf`;
+  // debug markers so we can confirm the client generator is executed in the browser
+  try { console.log('[PDF] generating client PDF for', invoice.id) } catch {}
+  try { toast.info('Generating PDF...') } catch {}
+  doc.save(filename);
   }
 
-  const handleDownloadWithPrices = () => generatePdf({ showPrices: true })
-  const handleDownloadWithoutPrices = () => generatePdf({ showPrices: false })
+  const handleDownloadWithPrices = async () => await generatePdf({ showPrices: true })
+  const handleDownloadWithoutPrices = async () => await generatePdf({ showPrices: false })
 
   return (
     <div className="space-y-6">
@@ -297,8 +387,8 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
                     </div>
                   </TableCell>
                   <TableCell className="text-right">{item.quantity}</TableCell>
-                  <TableCell className="text-right">${item.unitPrice.toFixed(2)}</TableCell>
-                  <TableCell className="text-right font-medium">${item.total.toFixed(2)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(item.unitPrice, DEFAULT_CURRENCY)}</TableCell>
+                  <TableCell className="text-right font-medium">{formatCurrency(item.total, DEFAULT_CURRENCY)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -309,15 +399,15 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
             <div className="w-64 space-y-2">
               <div className="flex justify-between">
                 <span>Subtotal:</span>
-                <span>${invoice.subtotal.toFixed(2)}</span>
+                <span>{formatCurrency(invoice.subtotal, DEFAULT_CURRENCY)}</span>
               </div>
               <div className="flex justify-between">
                 <span>Tax ({invoice.taxRate}%):</span>
-                <span>${invoice.taxAmount.toFixed(2)}</span>
+                <span>{formatCurrency(invoice.taxAmount, DEFAULT_CURRENCY)}</span>
               </div>
               <div className="flex justify-between font-bold text-lg border-t pt-2">
                 <span>Total:</span>
-                <span>${invoice.total.toFixed(2)}</span>
+                <span>{formatCurrency(invoice.total, DEFAULT_CURRENCY)}</span>
               </div>
             </div>
           </div>

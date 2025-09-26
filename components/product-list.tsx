@@ -19,15 +19,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Plus, Edit, Trash2, Loader2, Globe, User } from "lucide-react"
+import { Plus, Edit, Trash2, Loader2, Globe, User, BarChart } from "lucide-react"
+import Link from 'next/link'
+import { formatCurrency, DEFAULT_CURRENCY } from '@/lib/currency'
 import { toast } from "sonner"
 
 interface ProductListProps {
   onAddProduct: () => void
   onEditProduct: (product: Product) => void
+  onShowStats?: (productId: string) => void
 }
 
-export function ProductList({ onAddProduct, onEditProduct }: ProductListProps) {
+export function ProductList({ onAddProduct, onEditProduct, onShowStats }: ProductListProps) {
   const { user } = useAuth()
   const [products, setProducts] = useState<Product[]>([])
   const [query, setQuery] = useState("")
@@ -135,6 +138,7 @@ export function ProductList({ onAddProduct, onEditProduct }: ProductListProps) {
                 <TableHead>Stock</TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead>Price</TableHead>
+                <TableHead>Buying</TableHead>
                 <TableHead>Scope</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -153,7 +157,8 @@ export function ProductList({ onAddProduct, onEditProduct }: ProductListProps) {
                   <TableCell>
                     <Badge variant="outline">{product.category}</Badge>
                   </TableCell>
-                  <TableCell className="font-medium">${product.price.toFixed(2)}</TableCell>
+                  <TableCell className="font-medium">{formatCurrency(product.price, DEFAULT_CURRENCY)}</TableCell>
+                  <TableCell className="font-medium">{formatCurrency((product as unknown as { buyingPrice?: number }).buyingPrice ?? 0, DEFAULT_CURRENCY)}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
                       {product.isGlobal ? (
@@ -171,6 +176,10 @@ export function ProductList({ onAddProduct, onEditProduct }: ProductListProps) {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
+                      {/* Statistics icon first (open inline stats panel) */}
+                      <Button variant="ghost" size="sm" title="Statistics" onClick={() => onShowStats?.(product.id)}>
+                        <BarChart className="h-4 w-4" />
+                      </Button>
                       {canEditProduct(product) && (
                         <Button variant="outline" size="sm" onClick={() => onEditProduct(product)}>
                           <Edit className="h-4 w-4" />

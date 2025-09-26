@@ -18,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, ArrowLeft } from "lucide-react"
 import { toast } from "sonner"
+import { formatCurrency, DEFAULT_CURRENCY } from '@/lib/currency'
 import { invoiceService, type Invoice } from "@/lib/invoices"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
@@ -40,7 +41,7 @@ export function ClientForm({ client, onSuccess, onCancel, onViewInvoice }: Clien
       city: "",
       state: "",
       zipCode: "",
-      country: "USA",
+      country: "Germany",
     },
     notes: "",
   })
@@ -344,7 +345,7 @@ export function ClientForm({ client, onSuccess, onCancel, onViewInvoice }: Clien
                     <TableCell>{inv.invoiceNumber || inv.id.slice(0, 8)}</TableCell>
                     <TableCell>{inv.status}</TableCell>
                     <TableCell>{new Date(inv.dueDate).toLocaleDateString()}</TableCell>
-                    <TableCell>${inv.total?.toFixed(2)}</TableCell>
+                    <TableCell>{formatCurrency(inv.total ?? 0, DEFAULT_CURRENCY)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

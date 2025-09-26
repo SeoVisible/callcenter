@@ -3,6 +3,7 @@ export interface Product {
   name: string
   description: string
   price: number
+  buyingPrice?: number
   stock: number
   category: string
   sku: string
@@ -16,6 +17,7 @@ export interface CreateProductData {
   name: string
   description: string
   price: number
+  buyingPrice?: number
   stock?: number
   category: string
   sku: string
@@ -27,9 +29,18 @@ export interface UpdateProductData {
   name?: string
   description?: string
   price?: number
+  buyingPrice?: number
   stock?: number
   category?: string
   sku?: string
+}
+
+export interface ProductStats {
+  totalSold: number
+  revenueThisYear: number
+  profitThisYear: number
+  topClients: Array<{ id: string; name: string; quantity: number; revenue: number; profit: number }>
+  product: { price: number; buyingPrice: number }
 }
 
 class ProductService {
@@ -82,6 +93,15 @@ class ProductService {
       const data = await res.json()
       throw new Error(data.error || "Failed to delete product")
     }
+  }
+
+  async fetchProductStats(id: string): Promise<ProductStats> {
+    const res = await fetch(`/api/products/${id}/stats`)
+    if (!res.ok) {
+      const data = await res.json()
+      throw new Error(data.error || 'Failed to fetch product stats')
+    }
+    return res.json()
   }
 
   getCategories(): string[] {

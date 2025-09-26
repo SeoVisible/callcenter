@@ -1,6 +1,6 @@
 export interface InvoiceLineItem {
   id: string
-  productId: string
+  productId: string | null
   productName: string
   description: string
   quantity: number
@@ -55,11 +55,25 @@ export interface UpdateInvoiceData {
 }
 
 class InvoiceService {
-  async getAllInvoices(userId?: string, userRole?: string): Promise<Invoice[]> {
-    let url = "/api/invoices"
-    if (userId && userRole) {
-      url += `?userId=${encodeURIComponent(userId)}&userRole=${encodeURIComponent(userRole)}`
+  async getAllInvoices(userId?: string, userRole?: string, status?: string, sortBy?: string, sortDir?: string, clientId?: string, filterUserId?: string): Promise<Invoice[]> {
+    const buildUrl = (userId?: string, userRole?: string, status?: string, sortBy?: string, sortDir?: string, clientId?: string, filterUserId?: string) => {
+      let url = "/api/invoices"
+      const params: string[] = []
+      // userId/userRole refer to the caller (auth) context used to restrict results server-side
+      if (userId && userRole) {
+        params.push(`userId=${encodeURIComponent(userId)}`)
+        params.push(`userRole=${encodeURIComponent(userRole)}`)
+      }
+      // filterUserId is an explicit filter to fetch invoices for a specific user (superadmin can use it)
+      if (filterUserId) params.push(`filterUserId=${encodeURIComponent(filterUserId)}`)
+      if (status) params.push(`status=${encodeURIComponent(status)}`)
+      if (clientId) params.push(`clientId=${encodeURIComponent(clientId)}`)
+      if (sortBy) params.push(`sortBy=${encodeURIComponent(sortBy)}`)
+      if (sortDir) params.push(`sortDir=${encodeURIComponent(sortDir)}`)
+      if (params.length) url += `?${params.join('&')}`
+      return url
     }
+    const url = buildUrl(userId, userRole, status, sortBy, sortDir, clientId, filterUserId)
     const res = await fetch(url, { credentials: "include" })
     if (!res.ok) {
       const data = await res.json()
