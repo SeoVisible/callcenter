@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, type InvoiceItem as PrismaInvoiceItem, type Invoice as PrismaInvoice, type Client as PrismaClientType } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
@@ -7,10 +7,11 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   const { id } = await context.params
 
   // Fetch invoice items for this product and include invoice + client
-  const items = await prisma.invoiceItem.findMany({
+  type ItemWithInvoice = PrismaInvoiceItem & { invoice?: (PrismaInvoice & { client?: PrismaClientType }) | null }
+  const items = (await prisma.invoiceItem.findMany({
     where: { productId: id },
     include: { invoice: { include: { client: true } } },
-  })
+  })) as ItemWithInvoice[]
 
   // Fetch product to show its current price and buying price
   const product = await prisma.product.findUnique({ where: { id } })
@@ -33,7 +34,10 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   // include `buyingPrice` yet; cast to a narrow local type to avoid `any`.
   type ProductPartial = { buyingPrice?: number; price?: number }
   const p = product as unknown as ProductPartial
-  const productBP = Number(p.buyingPrice ?? it.buyingPrice ?? 0)
+  // Cast the invoice item to a narrow shape so TypeScript doesn't depend on the
+  // generated Prisma types (which can differ between local and Vercel builds).
+  const itTyped = it as unknown as { buyingPrice?: number }
+  const productBP = Number(p.buyingPrice ?? itTyped.buyingPrice ?? 0)
     totalSold += qty
 
     const invoiceDate = it.invoice?.createdAt ? new Date(it.invoice.createdAt) : null
