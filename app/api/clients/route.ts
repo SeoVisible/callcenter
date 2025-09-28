@@ -29,12 +29,20 @@ export async function POST(req: Request) {
       }
     }
 
-    // Validate address structure
-    const addressFields = ["street", "city", "state", "zipCode", "country"]
-    for (const field of addressFields) {
-      if (!data.address[field]) {
-        return NextResponse.json({ error: `Missing address field: ${field}` }, { status: 400 })
-      }
+    // Ensure address object exists; we will normalize missing keys (including
+    // `state`) so clients created from the UI (which no longer includes the
+    // province input) still succeed.
+    if (!data.address || typeof data.address !== 'object') {
+      return NextResponse.json({ error: `Missing required field: address` }, { status: 400 })
+    }
+
+    // Normalize address and ensure `state` exists (may be empty string)
+    const normalizedAddress = {
+      street: data.address.street ?? "",
+      city: data.address.city ?? "",
+      state: data.address.state ?? "",
+      zipCode: data.address.zipCode ?? "",
+      country: data.address.country ?? "Germany",
     }
 
     // Map to flat fields if needed (Prisma schema expects address as a JSON or as separate fields)
@@ -47,7 +55,7 @@ export async function POST(req: Request) {
         email: data.email,
         phone: data.phone,
         company: data.company,
-        address: data.address, // If address is not JSON, split into fields
+        address: normalizedAddress, // store normalized address object
         notes: data.notes,
         createdBy: data.createdBy,
       }

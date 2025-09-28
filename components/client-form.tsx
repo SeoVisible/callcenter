@@ -57,7 +57,13 @@ export function ClientForm({ client, onSuccess, onCancel, onViewInvoice }: Clien
         email: client.email,
         phone: client.phone,
         company: client.company,
-        address: client.address,
+        address: {
+          street: client.address?.street ?? "",
+          city: client.address?.city ?? "",
+          state: client.address?.state ?? "",
+          zipCode: client.address?.zipCode ?? "",
+          country: client.address?.country ?? "Germany",
+        },
         notes: client.notes,
       })
     }
