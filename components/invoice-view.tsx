@@ -123,7 +123,8 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
     doc.text('Josef-Schrögel-Str. 68', rightX, yBase + 12)
     doc.text('52349 Düren', rightX, yBase + 24)
     doc.text('Tel: 02421 / 95 90 176', rightX, yBase + 36)
-    doc.text('info@kompakt-arbeitsschutz.de', rightX, yBase + 48)
+  // PDF header email updated to pro domain (PDF-only)
+  doc.text('info@pro-arbeitsschutz.de', rightX, yBase + 48)
 
   // Title: render main label
   doc.setFontSize(20)
@@ -235,12 +236,21 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
       doc.setFont('helvetica', 'normal')
     }
 
-  // Footer with bank/contact info
+  // Footer with PDF-only bank/contact info
+    const formatIban = (iban?: string) => {
+      if (!iban) return ''
+      return String(iban).replace(/\s+/g, '').replace(/(.{4})/g, '$1 ').trim()
+    }
     const footerY = 780
     doc.setFontSize(9)
     doc.setTextColor(100)
-    doc.text('Kompakt GmbH — Josef-Schrögel-Str. 68, 52349 Düren — DE89 3700 0400 0289 5220 00', 40, footerY)
-    doc.text('info@kompakt-arbeitsschutz.de — Tel: 02421 / 95 90 176', 40, footerY + 12)
+    // Bank details shown only in the generated PDF (not added to invoice objects)
+    const bankIbanRaw = 'DE90506521240008142622' // from provided image: DE90 5065 2124 0008 1426 22
+    const bankBic = 'HELADEF1SLS'
+    const serviceHotline = '+49 89 411 3'
+    doc.text('Kompakt GmbH — Josef-Schrögel-Str. 68, 52349 Düren', 40, footerY)
+    doc.text(`IBAN: ${formatIban(bankIbanRaw)}  |  BIC: ${bankBic}`, 40, footerY + 12)
+    doc.text(`Servicehotline: ${serviceHotline}  — info@kompakt-arbeitsschutz.de`, 40, footerY + 24)
 
   const filename = showPrices ? `invoice-${invoice.id}.pdf` : `invoice-${invoice.id}-no-prices.pdf`;
   // debug markers so we can confirm the client generator is executed in the browser

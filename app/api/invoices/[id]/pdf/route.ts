@@ -36,7 +36,10 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 	doc.text('Josef-Schrögel-Str. 68', rightX, yBase + 12)
 	doc.text('52349 Düren', rightX, yBase + 24)
 	doc.text('Tel: 02421 / 95 90 176', rightX, yBase + 36)
-	doc.text('info@kompakt-arbeitsschutz.de', rightX, yBase + 48)
+	doc.text('info@pro-arbeitsschutz.de', rightX, yBase + 48)
+	doc.fontSize(9).fillColor('#666').text('IBAN: DE90 5065 2124 0008 1426 22  |  BIC: HELADEF1SLS', 40, 782)
+	doc.fontSize(9).fillColor('#666').text('Servicehotline: +49 89 411 3  — info@pro-arbeitsschutz.de', 40, 794)
+	doc.fontSize(9).fillColor('#666').text('www.pro-arbeitsschutz.de', 40, 806)
 
 		// Title
 		doc.moveDown(3)
