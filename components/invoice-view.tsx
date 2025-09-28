@@ -52,7 +52,7 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
 
   // Try to load a logo from /nifar_logo.jpg (public).
   // Re-encode to PNG via a canvas to ensure jsPDF.getImage works reliably across browsers and image types.
-    const fetchAndReencodePng = async (path: string): Promise<string | null> => {
+    const fetchAndReencodePng = async (path: string): Promise<{ dataUrl: string; width: number; height: number } | null> => {
       try {
         const resp = await fetch(path)
         if (!resp.ok) return null
@@ -63,7 +63,6 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
           reader.onerror = () => reject(new Error('Failed to read blob'))
           reader.readAsDataURL(blob)
         })
-
         const img = await new Promise<HTMLImageElement>((resolve, reject) => {
           const i = new Image()
           i.onload = () => resolve(i)
@@ -71,27 +70,43 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
           i.src = dataUrl
         })
 
+        const naturalW = img.naturalWidth || img.width || 200
+        const naturalH = img.naturalHeight || img.height || 60
         const canvas = document.createElement('canvas')
-        canvas.width = img.naturalWidth || img.width || 200
-        canvas.height = img.naturalHeight || img.height || 60
+        // re-encode at original resolution to avoid quality loss
+        canvas.width = naturalW
+        canvas.height = naturalH
         const ctx = canvas.getContext('2d')
-        if (!ctx) return dataUrl
+        if (!ctx) return { dataUrl, width: naturalW, height: naturalH }
         ctx.clearRect(0, 0, canvas.width, canvas.height)
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-        return canvas.toDataURL('image/png')
+        const png = canvas.toDataURL('image/png')
+        return { dataUrl: png, width: naturalW, height: naturalH }
       } catch (err) {
         return null
       }
     }
 
     // Try a list of candidate public paths so we prefer a stable PNG if available
-    const logoCandidates = ['/logo.png', '/nifar_logo.png', '/nifar_logo.jpg', '/nifar_logo.jpeg']
+    // prefer a pro-arbeitsschutz branded file if present in /public
+    const logoCandidates = [
+      '/pro-arbeitsschutz-logo.png',
+      '/pro-arbeitsschutz-logo.jpg',
+      '/logo.png',
+      '/nifar_logo.png',
+      '/nifar_logo.jpg',
+      '/nifar_logo.jpeg'
+    ]
     let logoDataUrl: string | null = null
+    let logoNaturalW = 0
+    let logoNaturalH = 0
     for (const p of logoCandidates) {
       try {
         const found = await fetchAndReencodePng(p)
         if (found) {
-          logoDataUrl = found
+          logoDataUrl = found.dataUrl
+          logoNaturalW = found.width
+          logoNaturalH = found.height
           break
         }
       } catch (e) {
@@ -99,32 +114,48 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
       }
     }
 
-  // Header: logo left, company info right
+  // Header: render logo on the left (replacing the textual company name), company info on the right
   const leftX = 20
-    const rightX = 420
-    const yBase = 40
-      if (logoDataUrl) {
-        try {
-          // we re-encoded to PNG above, so always pass PNG
-          const imgW = 140
-          const imgH = 50
-          doc.addImage(logoDataUrl, 'PNG', leftX, yBase - 10, imgW, imgH)
-        } catch (e) {
-          doc.setFontSize(18)
-          doc.text('Firma', leftX, yBase + 12)
-        }
-      } else {
-        doc.setFontSize(18)
-        doc.text('Firma', leftX, yBase + 12)
-      }
+  const rightX = 420
+  const yBase = 40
 
-    doc.setFontSize(10)
-    doc.text('Kompakt GmbH', rightX, yBase)
-    doc.text('Josef-Schrögel-Str. 68', rightX, yBase + 12)
-    doc.text('52349 Düren', rightX, yBase + 24)
-    doc.text('Tel: 02421 / 95 90 176', rightX, yBase + 36)
+  // Default info start (when no logo is present)
+  let infoStartY = yBase
+
+    if (logoDataUrl) {
+      try {
+        // compute scaled dimensions to preserve aspect ratio and fit within bounds
+        const maxW = 140
+        const maxH = 50
+        const naturalW = logoNaturalW || maxW
+        const naturalH = logoNaturalH || maxH
+        const scale = Math.min(maxW / naturalW, maxH / naturalH, 1)
+        const imgW = Math.round(naturalW * scale)
+        const imgH = Math.round(naturalH * scale)
+        // center vertically a little by offsetting yBase
+        const imgY = yBase - 10
+        doc.addImage(logoDataUrl, 'PNG', leftX, imgY, imgW, imgH)
+        // move company text down to sit under the logo
+        infoStartY = yBase + imgH - 8
+      } catch (e) {
+        // fallback: print site name on the left
+        doc.setFontSize(18)
+        doc.text('pro-arbeitsschutz.de', leftX, yBase + 12)
+      }
+    } else {
+      // show site name as fallback when no logo file is available in public/
+      doc.setFontSize(18)
+      doc.text('pro-arbeitsschutz.de', leftX, yBase + 12)
+    }
+
+  doc.setFontSize(10)
+  // render company/contact info starting at computed Y so it won't collide with the logo
+  doc.text('Kompakt GmbH', rightX, infoStartY)
+  doc.text('Josef-Schrögel-Str. 68', rightX, infoStartY + 12)
+  doc.text('52349 Düren', rightX, infoStartY + 24)
+  doc.text('Tel: 02421 / 95 90 176', rightX, infoStartY + 36)
   // PDF header email updated to pro domain (PDF-only)
-  doc.text('info@pro-arbeitsschutz.de', rightX, yBase + 48)
+  doc.text('info@pro-arbeitsschutz.de', rightX, infoStartY + 48)
 
   // Title: render main label
   doc.setFontSize(20)
@@ -236,21 +267,59 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
       doc.setFont('helvetica', 'normal')
     }
 
-  // Footer with PDF-only bank/contact info
+  // Footer with PDF-only bank/contact info — wrap long lines and place above bottom margin to avoid overlap
     const formatIban = (iban?: string) => {
       if (!iban) return ''
       return String(iban).replace(/\s+/g, '').replace(/(.{4})/g, '$1 ').trim()
     }
-    const footerY = 780
     doc.setFontSize(9)
     doc.setTextColor(100)
     // Bank details shown only in the generated PDF (not added to invoice objects)
     const bankIbanRaw = 'DE90506521240008142622' // from provided image: DE90 5065 2124 0008 1426 22
     const bankBic = 'HELADEF1SLS'
     const serviceHotline = '+49 89 411 3'
-    doc.text('Kompakt GmbH — Josef-Schrögel-Str. 68, 52349 Düren', 40, footerY)
-    doc.text(`IBAN: ${formatIban(bankIbanRaw)}  |  BIC: ${bankBic}`, 40, footerY + 12)
-    doc.text(`Servicehotline: ${serviceHotline}  — info@kompakt-arbeitsschutz.de`, 40, footerY + 24)
+    const website = 'www.pro-arbeitsschutz.de'
+
+    // compute page dimensions safely
+    const pageWidth = typeof (doc as any).internal.pageSize.getWidth === 'function'
+      ? (doc as any).internal.pageSize.getWidth()
+      : (doc as any).internal.pageSize.width
+    const pageHeight = typeof (doc as any).internal.pageSize.getHeight === 'function'
+      ? (doc as any).internal.pageSize.getHeight()
+      : (doc as any).internal.pageSize.height
+
+  const rightMargin = 40
+    const maxWidth = pageWidth - leftX - rightMargin
+
+    const companyLine = 'Kompakt GmbH — Josef-Schrögel-Str. 68, 52349 Düren'
+    const ibanLine = `IBAN: ${formatIban(bankIbanRaw)}  |  BIC: ${bankBic}`
+    const contactLine = `Servicehotline: ${serviceHotline}  — info@pro-arbeitsschutz.de`
+
+    // split lines to fit page width and compute a safe Y so footer doesn't overlap table/totals
+    const lines: string[] = []
+    lines.push(...doc.splitTextToSize(companyLine, maxWidth))
+    lines.push(...doc.splitTextToSize(ibanLine, maxWidth))
+    lines.push(...doc.splitTextToSize(contactLine, maxWidth))
+    lines.push(...doc.splitTextToSize(website, maxWidth))
+
+    // estimate line height (pts). 9pt font roughly 12pt line height
+    const lineHeight = 12
+    const totalHeight = lines.length * lineHeight
+    const bottomMargin = 40
+
+    // Preferred Y to place footer so it fits above the bottom margin
+    let footerStartY = pageHeight - bottomMargin - totalHeight
+
+    // If footer would overlap the invoice content/totals area, move it to a new page
+    // finalY is where the table/totals finished; ensure at least 24pt gap
+    const minGap = 24
+    if (finalY + minGap > footerStartY) {
+      doc.addPage()
+      footerStartY = 60
+    }
+
+    // render wrapped lines starting at computed Y
+    doc.text(lines, leftX, footerStartY)
 
   const filename = showPrices ? `invoice-${invoice.id}.pdf` : `invoice-${invoice.id}-no-prices.pdf`;
   // debug markers so we can confirm the client generator is executed in the browser

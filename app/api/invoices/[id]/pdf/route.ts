@@ -37,9 +37,36 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 	doc.text('52349 Düren', rightX, yBase + 24)
 	doc.text('Tel: 02421 / 95 90 176', rightX, yBase + 36)
 	doc.text('info@pro-arbeitsschutz.de', rightX, yBase + 48)
-	doc.fontSize(9).fillColor('#666').text('IBAN: DE90 5065 2124 0008 1426 22  |  BIC: HELADEF1SLS', 40, 782)
-	doc.fontSize(9).fillColor('#666').text('Servicehotline: +49 89 411 3  — info@pro-arbeitsschutz.de', 40, 794)
-	doc.fontSize(9).fillColor('#666').text('www.pro-arbeitsschutz.de', 40, 806)
+	// Footer: wrap lines and place above bottom margin, move to new page if not enough room
+	const footerLines = [
+		'Kompakt GmbH — Josef-Schrögel-Str. 68, 52349 Düren',
+		'IBAN: DE90 5065 2124 0008 1426 22  |  BIC: HELADEF1SLS',
+		'Servicehotline: +49 89 411 3  — info@pro-arbeitsschutz.de',
+		'www.pro-arbeitsschutz.de'
+	]
+
+	// estimate height and page dimensions
+	const bottomMargin = 40
+	const lineHeight = 12
+	const totalHeight = footerLines.length * lineHeight
+	const pageHeight = doc.page.height
+	let footerStartY = pageHeight - bottomMargin - totalHeight
+
+	// If current y (where content ended) would overlap footer, move footer to new page
+	const currentY = doc.y || 0
+	const minGap = 24
+	if (currentY + minGap > footerStartY) {
+		doc.addPage()
+		footerStartY = 60
+	}
+
+	// render footer lines
+	let y = footerStartY
+	doc.fontSize(9).fillColor('#666')
+	for (const line of footerLines) {
+		doc.text(line, 40, y)
+		y += lineHeight
+	}
 
 		// Title
 		doc.moveDown(3)
