@@ -25,6 +25,7 @@ import { Plus, Edit, Trash2, Loader2, MoreHorizontal, Send, Eye, CheckCircle } f
 import { toast } from "sonner"
 import { clientService } from "@/lib/clients"
 import { formatCurrency, DEFAULT_CURRENCY } from '@/lib/currency'
+import { formatDateSafe } from '@/lib/date'
 import { userService } from "@/lib/users"
 
 type InvoiceStatus = "pending" | "maker" | "sent" | "paid" | "not_paid" | "completed" | undefined
@@ -175,14 +176,14 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
 
     setSendingId(invoice.id)
     try {
-  const result = await invoiceService.sendInvoice(invoice.id)
-  // Optionally, show previewUrl or refetch invoices
-  toast.success("Rechnung gesendet!", { description: result.previewUrl ? `Vorschau: ${result.previewUrl}` : undefined })
-  // Optionally, reload invoices to update status
-  void loadInvoices()
-    toast.success(`Rechnung gesendet an ${invoice.clientEmail}`)
+      const result = await invoiceService.sendInvoice(invoice.id)
+      // Optionally, show previewUrl or refetch invoices
+      toast.success("Rechnung gesendet!", { description: result.previewUrl ? `Vorschau: ${result.previewUrl}` : undefined })
+      // Optionally, reload invoices to update status
+      void loadInvoices()
+      toast.success(`Rechnung gesendet an ${invoice.clientEmail}`)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to send invoice")
+      toast.error(error instanceof Error ? error.message : "Fehler beim Senden der Rechnung")
     } finally {
       setSendingId(null)
     }
@@ -193,11 +194,11 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
 
     setMarkingPaidId(invoice.id)
     try {
-  // Mark as paid not implemented in service. You may want to implement it in the API and service.
-  toast.info("Als bezahlt markieren ist nicht implementiert.")
-      toast.success("Invoice marked as paid")
+      // Mark as paid not implemented in service. You may want to implement it in the API and service.
+      toast.info("Als bezahlt markieren ist nicht implementiert.")
+      toast.success("Rechnung als bezahlt markiert")
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to update invoice")
+      toast.error(error instanceof Error ? error.message : "Fehler beim Aktualisieren der Rechnung")
     } finally {
       setMarkingPaidId(null)
     }
@@ -231,15 +232,235 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
     }
 
     if (!status) {
-      return <Badge variant="secondary" className="bg-gray-100 text-gray-800">Unknown</Badge>
+      return <Badge variant="secondary" className="bg-gray-100 text-gray-800">Unbekannt</Badge>
     }
     // Format status label (handle underscores like not_paid -> Not Paid)
-    const label = typeof status === 'string' ? formatStatusLabel(status) : 'Unknown'
+    const label = typeof status === 'string' ? formatStatusLabel(status) : 'Unbekannt'
     return (
       <Badge variant={variants[status]} className={colors[status]}>
         {label}
       </Badge>
     )
+  }
+
+  // Shared PDF generator to match single-invoice view
+  const generatePdf = async (invoice: Invoice, opts: { showPrices: boolean }) => {
+    const { showPrices } = opts
+    const jsPDF = (await import('jspdf')).default
+    const autoTable = (await import('jspdf-autotable')).default
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+
+    // Try to load a logo from /nifar_logo.jpg (public).
+    // Some browsers / image types cause jsPDF.addImage to fail when passed the raw data URL.
+    // To be robust, fetch the image, draw it to a canvas and re-encode as PNG data URL
+    // which jsPDF handles reliably.
+    const fetchAndReencodePng = async (path: string): Promise<string | null> => {
+      try {
+        const resp = await fetch(path)
+        if (!resp.ok) return null
+        const blob = await resp.blob()
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onloadend = () => resolve(String(reader.result ?? ''))
+          reader.onerror = () => reject(new Error('Failed to read blob'))
+          reader.readAsDataURL(blob)
+        })
+
+        // Create an image element so we can draw it to a canvas and re-encode as PNG
+        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const i = new Image()
+          i.onload = () => resolve(i)
+          i.onerror = () => reject(new Error('Image load error'))
+          i.src = dataUrl
+        })
+
+        // Draw to canvas at natural size to preserve quality, then get PNG data URL
+        const canvas = document.createElement('canvas')
+        canvas.width = img.naturalWidth || img.width || 200
+        canvas.height = img.naturalHeight || img.height || 60
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return dataUrl
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+        return canvas.toDataURL('image/png')
+      } catch (err) {
+        return null
+      }
+    }
+
+    // Try a list of candidate public paths so we prefer a stable PNG if available
+    const logoCandidates = ['/logo.png', '/nifar_logo.png', '/nifar_logo.jpg', '/nifar_logo.jpeg']
+    let logoDataUrl: string | null = null
+    for (const p of logoCandidates) {
+      try {
+        const found = await fetchAndReencodePng(p)
+        if (found) {
+          logoDataUrl = found
+          break
+        }
+      } catch (e) {
+        // ignore and try next
+      }
+    }
+
+  // Header: logo left, company info right
+  const leftX = 20
+    const rightX = 420
+    const yBase = 40
+    if (logoDataUrl) {
+      try {
+        // Always pass PNG (we re-encoded to PNG above)
+        const imgW = 140
+        const imgH = 50
+        doc.addImage(logoDataUrl, 'PNG', leftX, yBase - 10, imgW, imgH)
+      } catch (e) {
+        doc.setFontSize(18)
+        doc.text('Firma', leftX, yBase + 12)
+      }
+    } else {
+      doc.setFontSize(18)
+      doc.text('Firma', leftX, yBase + 12)
+    }
+
+    doc.setFontSize(10)
+    doc.text('Kompakt GmbH', rightX, yBase)
+    doc.text('Josef-Schrögel-Str. 68', rightX, yBase + 12)
+    doc.text('52349 Düren', rightX, yBase + 24)
+    doc.text('Tel: 02421 / 95 90 176', rightX, yBase + 36)
+    doc.text('info@kompakt-arbeitsschutz.de', rightX, yBase + 48)
+
+    // Title
+    doc.setFontSize(20)
+    doc.setTextColor(40, 40, 80)
+    doc.text('Rechnung', leftX, yBase + 80)
+
+  // Invoice identifier intentionally omitted from page header (kept only in filename)
+
+    // Client (left) and Invoice meta (right)
+    const clientY = yBase + 120
+    doc.setFontSize(11)
+    doc.setTextColor(0)
+    doc.text('Rechnung an:', leftX, clientY)
+    doc.setFontSize(10)
+    doc.text(invoice.clientName || '', leftX, clientY + 14)
+    if (invoice.clientCompany) doc.text(invoice.clientCompany, leftX, clientY + 28)
+    if (invoice.clientEmail) doc.text(invoice.clientEmail, leftX, clientY + 42)
+
+    const metaX = 360
+    doc.setFontSize(10)
+    const safeDate = (d: unknown) => {
+      try {
+        const dt = new Date(String(d))
+        if (isNaN(dt.getTime())) return ''
+        return dt.toLocaleDateString('de-DE')
+      } catch { return '' }
+    }
+    const invoiceDate = safeDate(invoice.issueDate ?? invoice.createdAt)
+    const serviceDate = safeDate(invoice.createdAt)
+    const dueDate = safeDate(invoice.dueDate)
+    if (invoiceDate) doc.text(`Rechnungsdatum: ${invoiceDate}`, metaX, clientY)
+    if (serviceDate) doc.text(`Leistungsdatum: ${serviceDate}`, metaX, clientY + 14)
+    if (dueDate) doc.text(`Fälligkeitsdatum: ${dueDate}`, metaX, clientY + 28)
+
+    // Items table
+    const head = showPrices ? ['Menge', 'Art.Nr.', 'Bezeichnung', 'Einzelpreis', 'Gesamt'] : ['Menge', 'Art.Nr.', 'Bezeichnung']
+    type LineWithSku = Invoice['lineItems'][number] & { sku?: string }
+    const body = invoice.lineItems.map((item) => {
+      const sku = (item as LineWithSku).sku || ''
+      const qty = Number(item.quantity ?? 0)
+      const unit = Number(item.unitPrice ?? 0)
+      const lineTotal = qty * unit
+      if (showPrices) {
+        return [String(qty), sku, item.productName + (item.description ? `\n${item.description}` : ''), formatCurrency(unit, DEFAULT_CURRENCY), formatCurrency(lineTotal, DEFAULT_CURRENCY)]
+      }
+      return [String(qty), sku, item.productName + (item.description ? `\n${item.description}` : '')]
+    })
+
+    autoTable(doc, {
+      startY: clientY + 80,
+      head: [head],
+      body,
+      headStyles: { fillColor: [245, 245, 245], textColor: 40, fontStyle: 'bold' },
+      styles: { cellPadding: 6, overflow: 'linebreak' },
+      columnStyles: {
+        0: { cellWidth: 50, halign: 'right' },
+        1: { cellWidth: 60, halign: 'left' },
+        2: { cellWidth: 260 },
+        3: { cellWidth: 80, halign: 'right' },
+        4: { cellWidth: 80, halign: 'right' }
+      },
+      bodyStyles: { fontSize: 10, valign: 'middle' }
+    })
+
+    interface DocWithAutoTable {
+      lastAutoTable?: { finalY: number }
+      internal: {
+        pageSize: {
+          getHeight?: () => number
+          getWidth?: () => number
+          height?: number
+          width?: number
+        }
+      }
+      addPage?: () => void
+    }
+
+    const finalY = ((doc as unknown as DocWithAutoTable).lastAutoTable?.finalY) || (clientY + 180)
+
+    // Totals box on the right
+    if (showPrices) {
+      const totalsX = 360
+      let line1Y = finalY + 28
+      const lineGap = 16
+      const internal = (doc as unknown as DocWithAutoTable).internal
+      const pageHeight = typeof internal.pageSize.getHeight === 'function'
+        ? internal.pageSize.getHeight!()
+        : (internal.pageSize.height ?? 0)
+      const bottomMargin = 60
+      const estimatedTotalsHeight = 80
+      if (line1Y + estimatedTotalsHeight > pageHeight - bottomMargin) {
+        doc.addPage()
+        line1Y = 60
+      }
+
+      const computedSubtotal = invoice.lineItems.reduce((s, it) => s + (Number(it.unitPrice ?? 0) * Number(it.quantity ?? 0)), 0)
+      const taxRateNum = Number(invoice.taxRate ?? 0)
+      const computedTax = computedSubtotal * (taxRateNum / 100)
+      const computedTotal = computedSubtotal + computedTax
+
+      const pageWidth = typeof internal.pageSize.getWidth === 'function'
+        ? internal.pageSize.getWidth!()
+        : (internal.pageSize.width ?? 0)
+      const valueX = pageWidth - 60
+
+      doc.setFontSize(10)
+      doc.setTextColor(40)
+      doc.setFont('helvetica', 'normal')
+      doc.text('Gesamt Netto:', totalsX, line1Y)
+      doc.text(formatCurrency(computedSubtotal, DEFAULT_CURRENCY), valueX, line1Y, { align: 'right' })
+
+      const taxRateStr = `${String(taxRateNum).replace('.', ',')}` + '\u00A0%'
+      doc.text(`Umsatzsteuer (${taxRateStr}):`, totalsX, line1Y + lineGap)
+      doc.text(formatCurrency(computedTax, DEFAULT_CURRENCY), valueX, line1Y + lineGap, { align: 'right' })
+
+      doc.setFontSize(12)
+      doc.setFont('helvetica', 'bold')
+      const bruttoY = line1Y + lineGap * 2 + 8
+      doc.text('Gesamt Brutto:', totalsX, bruttoY)
+      doc.text(formatCurrency(computedTotal, DEFAULT_CURRENCY), valueX, bruttoY, { align: 'right' })
+      doc.setFont('helvetica', 'normal')
+    }
+
+    // Footer
+    const footerY = 780
+    doc.setFontSize(9)
+    doc.setTextColor(100)
+    doc.text('Kompakt GmbH — Josef-Schrögel-Str. 68, 52349 Düren — DE89 3700 0400 0289 5220 00', 40, footerY)
+    doc.text('info@kompakt-arbeitsschutz.de — Tel: 02421 / 95 90 176', 40, footerY + 12)
+
+    const filename = showPrices ? `invoice-${invoice.id}.pdf` : `invoice-${invoice.id}-no-prices.pdf`;
+    try { toast.info('PDF wird erstellt...') } catch {}
+    doc.save(filename)
   }
 
   // Render UI immediately and show inline loading states (skeletons) instead
@@ -249,7 +470,10 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle>Rechnungsverwaltung</CardTitle>
+            <div className="flex items-center gap-3">
+              <CardTitle>Rechnungsverwaltung</CardTitle>
+              {!loading && <Badge className="text-sm">{invoices.length} Rechnungen</Badge>}
+            </div>
             <p className="text-sm text-muted-foreground mt-1">
               {user?.role === "superadmin" ? "Verwalten Sie alle Rechnungen im System" : "Verwalten Sie Ihre Rechnungen"}
             </p>
@@ -328,273 +552,146 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
                 ))
               ) : (
                 filteredInvoices.map((invoice) => (
-                <TableRow key={invoice.id}>
-                  <TableCell>
-                    <div className="font-mono text-sm">{invoice.id}</div>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{invoice.clientName}</div>
-                      <div className="text-sm text-muted-foreground">{invoice.clientCompany}</div>
-                    </div>
-                  </TableCell>
-                  
-                  <TableCell>
-                    <div className="text-sm">{invoice.userName}</div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="font-medium">{typeof invoice.total === 'number' ? formatCurrency(invoice.total, DEFAULT_CURRENCY) : formatCurrency(0, DEFAULT_CURRENCY)}</div>
-                  </TableCell>
-                  <TableCell>{getStatusBadge(invoice.status)}</TableCell>
-                  <TableCell>{new Date(invoice.createdAt).toLocaleDateString()}</TableCell>
-                  <TableCell>
-                    <div className="text-sm">{new Date(invoice.dueDate).toLocaleDateString()}</div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button variant="outline" size="sm" onClick={() => onViewInvoice(invoice)}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="sm">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {canEditInvoice(invoice) && (
-                            <DropdownMenuItem onClick={() => onEditInvoice(invoice)}>
-                              <Edit className="mr-2 h-4 w-4" />
-                              Bearbeiten
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem
-                            onClick={async () => {
-                              try {
-                                setSendingId(invoice.id)
-                                const result = await invoiceService.sendInvoice(invoice.id)
-                                setSendingId(null)
-                                if (result.previewUrl) {
-                                  toast.success('Rechnungs-E-Mail gesendet! (Vorschau)', {
-                                    description: (
-                                      <a href={result.previewUrl} target="_blank" rel="noopener noreferrer" className="underline text-blue-600">E-Mail anzeigen</a>
-                                    )
-                                  })
-                                } else {
-                                  toast.success('Rechnungs-E-Mail gesendet!')
-                                }
-                              } catch (error) {
-                                setSendingId(null)
-                                toast.error(error instanceof Error ? error.message : 'Fehler beim Senden der Rechnungs-E-Mail')
-                              }
-                            }}
-                            disabled={sendingId === invoice.id}
-                          >
-                            <Send className="mr-2 h-4 w-4" />
-                            Rechnung per E-Mail
-                          </DropdownMenuItem>
-                          {/* Single Download submenu: Client PDF (with prices) and Maker PDF (no prices) */}
-                          <DropdownMenuSub>
-                            <DropdownMenuSubTrigger>
-                              PDF herunterladen
-                            </DropdownMenuSubTrigger>
-                            <DropdownMenuSubContent>
-                              <DropdownMenuItem onClick={async () => {
-                                // Client PDF (with prices) - trigger client-side generation and save
-                                const jsPDF = (await import('jspdf')).default;
-                                const autoTable = (await import('jspdf-autotable')).default;
-                                const doc = new jsPDF();
-                                // Header
-                                doc.setFontSize(22);
-                                doc.setTextColor(40, 40, 80);
-                                doc.text(`RECHNUNG`, 14, 18);
-                                doc.setFontSize(12);
-                                doc.setTextColor(100);
-                                doc.text(`invoice-${invoice.id}`, 14, 26);
-                                doc.setTextColor(0);
-                                doc.setFontSize(11);
-                              doc.text(`Status: ${formatStatusLabel(invoice.status)}`, 150, 18, { align: "right" });
-                                doc.text(`Created: ${new Date(invoice.createdAt).toLocaleDateString()}`, 150, 26, { align: "right" });
-                                doc.text(`Due: ${new Date(invoice.dueDate).toLocaleDateString()}`, 150, 34, { align: "right" });
+                  <TableRow key={invoice.id}>
+                    <TableCell>
+                      <div className="font-mono text-sm">{invoice.id}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">{invoice.clientName}</div>
+                        <div className="text-sm text-muted-foreground">{invoice.clientCompany}</div>
+                      </div>
+                    </TableCell>
 
-                                // Bill To
-                                doc.setFontSize(13);
-                                doc.setTextColor(40, 40, 80);
-                                doc.text("Rechnung an:", 14, 42);
-                                doc.setFontSize(11);
-                                doc.setTextColor(0);
-                                doc.text(invoice.clientName, 14, 48);
-                                if (invoice.clientCompany) doc.text(invoice.clientCompany, 14, 54);
-                                if (invoice.clientEmail) doc.text(invoice.clientEmail, 14, 60);
-
-                                // Table (with prices)
-                                autoTable(doc, {
-                                  startY: 70,
-                                  head: [["Description", "Qty", "Unit Price", "Total"]],
-                                  body: invoice.lineItems.map(item => [
-                                    item.productName + (item.description ? `\n${item.description}` : ""),
-                                    item.quantity,
-                                    formatCurrency(item.unitPrice, DEFAULT_CURRENCY),
-                                    formatCurrency(item.total, DEFAULT_CURRENCY)
-                                  ]),
-                                  headStyles: { fillColor: [40, 40, 80], textColor: 255, fontStyle: 'bold' },
-                                  bodyStyles: { fontSize: 10 },
-                                  alternateRowStyles: { fillColor: [245, 245, 255] },
-                                  styles: { cellPadding: 2 },
-                                });
-
-                                const finalY = ((doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY) || 100;
-                                // Totals
-                                doc.setFontSize(11);
-                                doc.setTextColor(40, 40, 80);
-                                doc.text(`Subtotal:`, 130, finalY + 10);
-                                doc.text(formatCurrency(invoice.subtotal, DEFAULT_CURRENCY), 180, finalY + 10, { align: "right" });
-                                doc.text(`Tax (${invoice.taxRate}%):`, 130, finalY + 18);
-                                doc.text(formatCurrency(invoice.taxAmount, DEFAULT_CURRENCY), 180, finalY + 18, { align: "right" });
-                                doc.setFont("helvetica", "bold");
-                                doc.setFontSize(13);
-                                doc.text(`Total:`, 130, finalY + 28);
-                                doc.text(formatCurrency(invoice.total, DEFAULT_CURRENCY), 180, finalY + 28, { align: "right" });
-                                doc.setFont("helvetica", "normal");
-                                doc.setFontSize(11);
-                                doc.setTextColor(0);
-
-                                // Notes
-                                if (invoice.notes) {
-                                  doc.setFontSize(11);
-                                  doc.setTextColor(40, 40, 80);
-                                  doc.text("Notes:", 14, finalY + 40);
-                                  doc.setFontSize(10);
-                                  doc.setTextColor(80);
-                                  doc.text(invoice.notes, 14, finalY + 48, { maxWidth: 180 });
-                                  doc.setTextColor(0);
-                                }
-
-                                doc.save(`invoice-${invoice.id}.pdf`);
-                              }}>
-                                Kunden-PDF (mit Preisen)
+                    <TableCell>
+                      <div className="text-sm">{invoice.userName}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium">{typeof invoice.total === 'number' ? formatCurrency(invoice.total, DEFAULT_CURRENCY) : formatCurrency(0, DEFAULT_CURRENCY)}</div>
+                    </TableCell>
+                    <TableCell>{getStatusBadge(invoice.status)}</TableCell>
+                    <TableCell>{formatDateSafe(invoice.createdAt)}</TableCell>
+                    <TableCell>
+                      <div className="text-sm">{formatDateSafe(invoice.dueDate)}</div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button variant="outline" size="sm" onClick={() => onViewInvoice(invoice)}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {canEditInvoice(invoice) && (
+                              <DropdownMenuItem onClick={() => onEditInvoice(invoice)}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Bearbeiten
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={async () => {
-                                // Maker PDF (no prices)
-                                const jsPDF = (await import('jspdf')).default;
-                                const autoTable = (await import('jspdf-autotable')).default;
-                                const doc = new jsPDF();
-                                // Header
-                                doc.setFontSize(22);
-                                doc.setTextColor(40, 40, 80);
-                                doc.text(`RECHNUNG`, 14, 18);
-                                doc.setFontSize(12);
-                                doc.setTextColor(100);
-                                doc.text(`invoice-${invoice.id}`, 14, 26);
-                                doc.setTextColor(0);
-                                doc.setFontSize(11);
-                                doc.text(`Status: ${formatStatusLabel(invoice.status)}`, 150, 18, { align: "right" });
-                                doc.text(`Created: ${new Date(invoice.createdAt).toLocaleDateString()}`, 150, 26, { align: "right" });
-                                doc.text(`Due: ${new Date(invoice.dueDate).toLocaleDateString()}`, 150, 34, { align: "right" });
-
-                                // Bill To
-                                doc.setFontSize(13);
-                                doc.setTextColor(40, 40, 80);
-                                doc.text("Rechnung an:", 14, 42);
-                                doc.setFontSize(11);
-                                doc.setTextColor(0);
-                                doc.text(invoice.clientName, 14, 48);
-                                if (invoice.clientCompany) doc.text(invoice.clientCompany, 14, 54);
-                                if (invoice.clientEmail) doc.text(invoice.clientEmail, 14, 60);
-
-                                // Table (no prices)
-                                autoTable(doc, {
-                                  startY: 70,
-                                  head: [["Description", "Qty"]],
-                                  body: invoice.lineItems.map(item => [
-                                    item.productName + (item.description ? `\n${item.description}` : ""),
-                                    item.quantity
-                                  ]),
-                                  headStyles: { fillColor: [40, 40, 80], textColor: 255, fontStyle: 'bold' },
-                                  bodyStyles: { fontSize: 10 },
-                                  alternateRowStyles: { fillColor: [245, 245, 255] },
-                                  styles: { cellPadding: 2 },
-                                });
-
-                                // Notes
-                                const finalY = ((doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY) || 100;
-                                if (invoice.notes) {
-                                  doc.setFontSize(11);
-                                  doc.setTextColor(40, 40, 80);
-                                  doc.text("Notes:", 14, finalY + 20);
-                                  doc.setFontSize(10);
-                                  doc.setTextColor(80);
-                                  doc.text(invoice.notes, 14, finalY + 28, { maxWidth: 180 });
-                                  doc.setTextColor(0);
-                                }
-
-                                doc.save(`invoice-${invoice.id}-no-prices.pdf`);
-                              }}>
-                                Interne-PDF (ohne Preise)
-                              </DropdownMenuItem>
-                            </DropdownMenuSubContent>
-                          </DropdownMenuSub>
-                          {canEditInvoice(invoice) && (invoice.status === "pending" || invoice.status === "maker") && (
+                            )}
                             <DropdownMenuItem
-                              onClick={() => handleSendInvoice(invoice)}
+                              onClick={async () => {
+                                try {
+                                  setSendingId(invoice.id)
+                                  const result = await invoiceService.sendInvoice(invoice.id)
+                                  setSendingId(null)
+                                  if (result.previewUrl) {
+                                    toast.success('Rechnungs-E-Mail gesendet! (Vorschau)', {
+                                      description: (
+                                        <a href={result.previewUrl} target="_blank" rel="noopener noreferrer" className="underline text-blue-600">E-Mail anzeigen</a>
+                                      )
+                                    })
+                                  } else {
+                                    toast.success('Rechnungs-E-Mail gesendet!')
+                                  }
+                                } catch (error) {
+                                  setSendingId(null)
+                                  toast.error(error instanceof Error ? error.message : 'Fehler beim Senden der Rechnungs-E-Mail')
+                                }
+                              }}
                               disabled={sendingId === invoice.id}
                             >
-                              {sendingId === invoice.id ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              ) : (
-                                <Send className="mr-2 h-4 w-4" />
-                              )}
-                              Rechnung senden
+                              <Send className="mr-2 h-4 w-4" />
+                              Rechnung per E-Mail
                             </DropdownMenuItem>
-                          )}
-                          {canEditInvoice(invoice) && (invoice.status === "sent" || invoice.status === "not_paid") && (
-                            <DropdownMenuItem
-                              onClick={() => handleMarkAsPaid(invoice)}
-                              disabled={markingPaidId === invoice.id}
-                            >
-                              {markingPaidId === invoice.id ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              ) : (
-                                <CheckCircle className="mr-2 h-4 w-4" />
-                              )}
-                              Als bezahlt markieren
-                            </DropdownMenuItem>
-                          )}
-                          {canDeleteInvoice(invoice) && (
-                            <DropdownMenuItem onClick={() => setDeleteInvoice(invoice)} className="text-destructive">
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Löschen
-                            </DropdownMenuItem>
-                          )}
-                          <div className="border-t my-1" />
-                          <div className="px-2 text-xs text-muted-foreground">Status ändern</div>
-                          {['pending','maker','sent','paid','not_paid','completed'].map((s) => (
-                            <DropdownMenuItem key={s} onClick={async () => {
-                              const newStatus = toInvoiceStatus(s)
-                              if (!newStatus) return
-                              // optimistic update: update state immediately, call API, revert on failure
-                              const prev = invoices
-                              try {
-                                setInvoices(prev.map(i => i.id === invoice.id ? { ...i, status: newStatus } : i))
-                                setUpdatingStatusId(invoice.id)
-                                await invoiceService.updateInvoice(invoice.id, { status: newStatus })
-                                toast.success(`Status geändert zu ${formatStatusLabel(s)}`)
-                              } catch (err) {
-                                // revert
-                                setInvoices(prev)
-                                toast.error(err instanceof Error ? err.message : 'Fehler beim Aktualisieren des Status')
-                              } finally {
-                                setUpdatingStatusId(null)
-                              }
-                            }}>
-                              {formatStatusLabel(s)}
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </TableCell>
-                </TableRow>
+                            {/* Single Download submenu: Client PDF (with prices) and Maker PDF (no prices) */}
+                            <DropdownMenuSub>
+                              <DropdownMenuSubTrigger>
+                                PDF herunterladen
+                              </DropdownMenuSubTrigger>
+                              <DropdownMenuSubContent>
+                                <DropdownMenuItem onClick={async () => await generatePdf(invoice, { showPrices: true })}>
+                                  Kunden-PDF (mit Preisen)
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={async () => await generatePdf(invoice, { showPrices: false })}>
+                                  Interne-PDF (ohne Preise)
+                                </DropdownMenuItem>
+                              </DropdownMenuSubContent>
+                            </DropdownMenuSub>
+                            {canEditInvoice(invoice) && (invoice.status === "pending" || invoice.status === "maker") && (
+                              <DropdownMenuItem
+                                onClick={() => handleSendInvoice(invoice)}
+                                disabled={sendingId === invoice.id}
+                              >
+                                {sendingId === invoice.id ? (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Send className="mr-2 h-4 w-4" />
+                                )}
+                                Rechnung senden
+                              </DropdownMenuItem>
+                            )}
+                            {canEditInvoice(invoice) && (invoice.status === "sent" || invoice.status === "not_paid") && (
+                              <DropdownMenuItem
+                                onClick={() => handleMarkAsPaid(invoice)}
+                                disabled={markingPaidId === invoice.id}
+                              >
+                                {markingPaidId === invoice.id ? (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                  <CheckCircle className="mr-2 h-4 w-4" />
+                                )}
+                                Als bezahlt markieren
+                              </DropdownMenuItem>
+                            )}
+                            {canDeleteInvoice(invoice) && (
+                              <DropdownMenuItem onClick={() => setDeleteInvoice(invoice)} className="text-destructive">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Löschen
+                              </DropdownMenuItem>
+                            )}
+                            <div className="border-t my-1" />
+                            <div className="px-2 text-xs text-muted-foreground">Status ändern</div>
+                            {['pending','maker','sent','paid','not_paid','completed'].map((s) => (
+                              <DropdownMenuItem key={s} onClick={async () => {
+                                const newStatus = toInvoiceStatus(s)
+                                if (!newStatus) return
+                                // optimistic update: update state immediately, call API, revert on failure
+                                const prev = invoices
+                                try {
+                                  setInvoices(prev.map(i => i.id === invoice.id ? { ...i, status: newStatus } : i))
+                                  setUpdatingStatusId(invoice.id)
+                                  await invoiceService.updateInvoice(invoice.id, { status: newStatus })
+                                  toast.success(`Status geändert zu ${formatStatusLabel(s)}`)
+                                } catch (err) {
+                                  // revert
+                                  setInvoices(prev)
+                                  toast.error(err instanceof Error ? err.message : 'Fehler beim Aktualisieren des Status')
+                                } finally {
+                                  setUpdatingStatusId(null)
+                                }
+                              }}>
+                                {formatStatusLabel(s)}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </TableCell>
+                  </TableRow>
                 ))
               )}
             </TableBody>

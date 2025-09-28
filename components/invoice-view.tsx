@@ -14,6 +14,7 @@ import { invoiceService } from "@/lib/invoices"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 import { formatCurrency, DEFAULT_CURRENCY } from '@/lib/currency'
+import { formatDateSafe } from '@/lib/date'
 import { toast } from "sonner"
 import { formatStatusLabel } from '@/lib/status'
 
@@ -49,38 +50,73 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
     const { showPrices } = opts;
     const doc = new jsPDF({ unit: 'pt', format: 'a4' });
 
-  // Try to load a logo from /nifar_logo.jpg (public) using fetch->blob->dataURL
-  // This is more reliable than Image + canvas for local dev and avoids CORS issues.
-    let logoDataUrl: string | null = null
-    try {
-      const resp = await fetch('/nifar_logo.jpg')
-      if (resp.ok) {
+  // Try to load a logo from /nifar_logo.jpg (public).
+  // Re-encode to PNG via a canvas to ensure jsPDF.getImage works reliably across browsers and image types.
+    const fetchAndReencodePng = async (path: string): Promise<string | null> => {
+      try {
+        const resp = await fetch(path)
+        if (!resp.ok) return null
         const blob = await resp.blob()
-        logoDataUrl = await new Promise<string>((resolve) => {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader()
           reader.onloadend = () => resolve(String(reader.result ?? ''))
+          reader.onerror = () => reject(new Error('Failed to read blob'))
           reader.readAsDataURL(blob)
         })
+
+        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const i = new Image()
+          i.onload = () => resolve(i)
+          i.onerror = () => reject(new Error('Image load error'))
+          i.src = dataUrl
+        })
+
+        const canvas = document.createElement('canvas')
+        canvas.width = img.naturalWidth || img.width || 200
+        canvas.height = img.naturalHeight || img.height || 60
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return dataUrl
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+        return canvas.toDataURL('image/png')
+      } catch (err) {
+        return null
       }
-    } catch (e) {
-      logoDataUrl = null
+    }
+
+    // Try a list of candidate public paths so we prefer a stable PNG if available
+    const logoCandidates = ['/logo.png', '/nifar_logo.png', '/nifar_logo.jpg', '/nifar_logo.jpeg']
+    let logoDataUrl: string | null = null
+    for (const p of logoCandidates) {
+      try {
+        const found = await fetchAndReencodePng(p)
+        if (found) {
+          logoDataUrl = found
+          break
+        }
+      } catch (e) {
+        // ignore and try next
+      }
     }
 
   // Header: logo left, company info right
-    const leftX = 40
+  const leftX = 20
     const rightX = 420
     const yBase = 40
       if (logoDataUrl) {
-      try {
-        doc.addImage(logoDataUrl, 'PNG', leftX, yBase - 8, 120, 40)
-      } catch (e) {
+        try {
+          // we re-encoded to PNG above, so always pass PNG
+          const imgW = 140
+          const imgH = 50
+          doc.addImage(logoDataUrl, 'PNG', leftX, yBase - 10, imgW, imgH)
+        } catch (e) {
+          doc.setFontSize(18)
+          doc.text('Firma', leftX, yBase + 12)
+        }
+      } else {
         doc.setFontSize(18)
         doc.text('Firma', leftX, yBase + 12)
       }
-    } else {
-      doc.setFontSize(18)
-      doc.text('Firma', leftX, yBase + 12)
-    }
 
     doc.setFontSize(10)
     doc.text('Kompakt GmbH', rightX, yBase)
@@ -94,13 +130,7 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
   doc.setTextColor(40, 40, 80)
   doc.text('Rechnung', leftX, yBase + 80)
 
-  // Invoice identifier: place near company block (top-right)
-  const idText = String(invoice.invoiceNumber || invoice.id || '')
-  doc.setFontSize(10)
-  doc.setTextColor(80)
-  const idMaxWidth = 240
-  const idLines = typeof (doc as any).splitTextToSize === 'function' ? (doc as any).splitTextToSize(idText, idMaxWidth) : [idText]
-  doc.text(idLines, rightX, yBase + 70)
+  // Invoice identifier intentionally omitted from page header (kept only in filename)
 
   // Client (left) and Invoice meta (right)
   const clientY = yBase + 120
@@ -115,13 +145,7 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
     const metaX = 360
     doc.setFontSize(10)
   // Use safe date handling: prefer issueDate, fall back to createdAt; show empty if invalid
-    const safeDate = (d: any) => {
-      try {
-        const dt = new Date(d)
-        if (isNaN(dt.getTime())) return ''
-        return dt.toLocaleDateString()
-      } catch { return '' }
-    }
+    const safeDate = (d: any) => formatDateSafe(d, 'de-DE')
     const invoiceDate = safeDate(invoice.issueDate ?? invoice.createdAt)
     const serviceDate = safeDate(invoice.createdAt)
     const dueDate = safeDate(invoice.dueDate)
@@ -184,23 +208,30 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
       const computedTax = computedSubtotal * (taxRateNum / 100)
       const computedTotal = computedSubtotal + computedTax
 
+      // place values right-aligned to a safe page margin to avoid collisions with labels
+      const pageWidth = typeof (doc as any).internal.pageSize.getWidth === 'function'
+        ? (doc as any).internal.pageSize.getWidth()
+        : (doc as any).internal.pageSize.width
+      const valueX = pageWidth - 60
+
       doc.setFontSize(10)
       doc.setTextColor(40)
       // Netto
       doc.setFont('helvetica', 'normal')
       doc.text('Gesamt Netto:', totalsX, line1Y)
-      doc.text(formatCurrency(computedSubtotal, DEFAULT_CURRENCY), totalsX + 120, line1Y, { align: 'right' })
+      doc.text(formatCurrency(computedSubtotal, DEFAULT_CURRENCY), valueX, line1Y, { align: 'right' })
 
-      // Tax
-      doc.text(`Umsatzsteuer (${taxRateNum}%):`, totalsX, line1Y + lineGap)
-      doc.text(formatCurrency(computedTax, DEFAULT_CURRENCY), totalsX + 120, line1Y + lineGap, { align: 'right' })
+      // Tax (format percent with comma + NBSP)
+      const taxRateStr = `${String(taxRateNum).replace('.', ',')}` + '\u00A0%'
+      doc.text(`Umsatzsteuer (${taxRateStr}):`, totalsX, line1Y + lineGap)
+      doc.text(formatCurrency(computedTax, DEFAULT_CURRENCY), valueX, line1Y + lineGap, { align: 'right' })
 
       // Brutto (bold) - draw once
       doc.setFontSize(12)
       doc.setFont('helvetica', 'bold')
       const bruttoY = line1Y + lineGap * 2 + 8
       doc.text('Gesamt Brutto:', totalsX, bruttoY)
-      doc.text(formatCurrency(computedTotal, DEFAULT_CURRENCY), totalsX + 120, bruttoY, { align: 'right' })
+      doc.text(formatCurrency(computedTotal, DEFAULT_CURRENCY), valueX, bruttoY, { align: 'right' })
       doc.setFont('helvetica', 'normal')
     }
 
@@ -278,7 +309,7 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
                 </div>
               </CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
-                Erstellt am {new Date(invoice.createdAt).toLocaleDateString()}
+                Erstellt am {formatDateSafe(invoice.createdAt)}
               </p>
             </div>
           </div>
@@ -339,22 +370,22 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
             <div className="space-y-2">
               <div className="flex justify-between">
                 <span className="text-sm text-muted-foreground">Ausstellungsdatum:</span>
-                <span className="text-sm">{new Date(invoice.issueDate).toLocaleDateString()}</span>
+                <span className="text-sm">{formatDateSafe(invoice.issueDate)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-muted-foreground">Fälligkeitsdatum:</span>
-                <span className="text-sm">{new Date(invoice.dueDate).toLocaleDateString()}</span>
+                <span className="text-sm">{formatDateSafe(invoice.dueDate)}</span>
               </div>
               {invoice.sentAt && (
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">Versendet am:</span>
-                  <span className="text-sm">{new Date(invoice.sentAt).toLocaleDateString()}</span>
+                  <span className="text-sm">{formatDateSafe(invoice.sentAt)}</span>
                 </div>
               )}
               {invoice.paidAt && (
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">Bezahlt am:</span>
-                  <span className="text-sm">{new Date(invoice.paidAt).toLocaleDateString()}</span>
+                  <span className="text-sm">{formatDateSafe(invoice.paidAt)}</span>
                 </div>
               )}
             </div>

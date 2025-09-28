@@ -176,10 +176,12 @@ export function ProductList({ onAddProduct, onEditProduct, onShowStats }: Produc
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      {/* Statistics icon first (open inline stats panel) */}
-                      <Button variant="ghost" size="sm" title="Statistics" onClick={() => onShowStats?.(product.id)}>
-                        <BarChart className="h-4 w-4" />
-                      </Button>
+                      {/* Statistics icon first (open inline stats panel) - only visible to superadmin */}
+                      {user?.role === 'superadmin' && (
+                        <Button variant="ghost" size="sm" title="Statistiken" onClick={() => onShowStats?.(product.id)}>
+                          <BarChart className="h-4 w-4" />
+                        </Button>
+                      )}
                       {canEditProduct(product) && (
                         <Button variant="outline" size="sm" onClick={() => onEditProduct(product)}>
                           <Edit className="h-4 w-4" />

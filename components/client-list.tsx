@@ -118,16 +118,16 @@ export function ClientList({ onAddClient, onEditClient }: ClientListProps) {
         </CardHeader>
         <CardContent>
           <div className="mb-4">
-            <Input placeholder="Search clients by name, company, email, phone or id..." value={query} onChange={(e) => setQuery(e.target.value)} />
+            <Input placeholder="Nach Kunden, Firma, E-Mail, Telefon oder ID suchen..." value={query} onChange={(e) => setQuery(e.target.value)} />
           </div>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Client</TableHead>
-                <TableHead>Company</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>Kunde</TableHead>
+                <TableHead>Firma</TableHead>
+                <TableHead>Kontakt</TableHead>
+                <TableHead>Ort</TableHead>
+                <TableHead className="text-right">Aktionen</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -161,7 +161,7 @@ export function ClientList({ onAddClient, onEditClient }: ClientListProps) {
                   <TableCell>
                     <div className="text-sm">
                       <div>
-                        {client.address.city}, {client.address.state}
+                        {client.address.city}
                       </div>
                       <div className="text-muted-foreground">{client.address.country}</div>
                     </div>

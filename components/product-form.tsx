@@ -327,7 +327,7 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
             </Button>
           </div>
         </form>
-        {product && stats && (
+        {product && stats && user?.role === 'superadmin' && (
           <div className="mt-6">
             <Card>
                 <CardHeader>

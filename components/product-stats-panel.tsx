@@ -3,12 +3,14 @@
 
 import { useEffect, useState } from 'react'
 import { productService } from '@/lib/products'
+import { useAuth } from '@/contexts/auth-context'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Loader2 } from 'lucide-react'
 import { formatCurrency, DEFAULT_CURRENCY } from '@/lib/currency'
 
 export function ProductStatsPanel({ id, onClose }: { id: string; onClose: () => void }) {
+  const { user } = useAuth()
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<any>(null)
 
@@ -22,6 +24,9 @@ export function ProductStatsPanel({ id, onClose }: { id: string; onClose: () => 
     }).finally(() => mounted && setLoading(false))
     return () => { mounted = false }
   }, [id])
+
+  // Only allow superadmin users to view product stats panel
+  if (user?.role !== 'superadmin') return null
 
   return (
     <Card>

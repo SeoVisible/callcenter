@@ -27,7 +27,7 @@ export default function DashboardPage() {
   const searchParams = useSearchParams()
   const paramFilterUserId = searchParams?.get('filterUserId') ?? undefined
   const { user } = useAuth()
-  const [activeSection, setActiveSection] = useState(paramFilterUserId ? "invoices" : "dashboard")
+  const [activeSection, setActiveSection] = useState<string>(paramFilterUserId ? "invoices" : "dashboard")
   const [showUserForm, setShowUserForm] = useState(false)
   const [editingUser, setEditingUser] = useState<User | undefined>()
   const [showProductForm, setShowProductForm] = useState(false)
@@ -82,6 +82,7 @@ export default function DashboardPage() {
   }
 
   const handleShowProductStats = (id: string) => {
+    if (user?.role !== 'superadmin') return
     setShowStatsProductId(id)
     // ensure product form isn't visible
     setShowProductForm(false)
@@ -222,7 +223,24 @@ export default function DashboardPage() {
     }
 
     // Default dashboard view: show DashboardHome (graphs/statistics)
-    return <DashboardHome />
+    // Prevent non-superadmin users from seeing DashboardHome: show Clients instead.
+    if (activeSection === "dashboard") {
+      if (user?.role !== "superadmin") {
+        // normal users should see Clients instead of DashboardHome
+        if (showClientForm) {
+          return (
+            <ClientForm
+              client={editingClient}
+              onSuccess={handleClientFormSuccess}
+              onCancel={handleClientFormCancel}
+              onViewInvoice={handleViewInvoice}
+            />
+          )
+        }
+        return <ClientList onAddClient={handleAddClient} onEditClient={handleEditClient} />
+      }
+      return <DashboardHome />
+    }
   }
 
   // If the URL contains a filterUserId param (e.g. via /dashboard?filterUserId=...),
@@ -230,6 +248,13 @@ export default function DashboardPage() {
   useEffect(() => {
     if (paramFilterUserId) setActiveSection("invoices")
   }, [paramFilterUserId])
+
+  // Ensure non-superadmin users never see the dashboard: default them to the clients section.
+  useEffect(() => {
+    if (user && user.role !== 'superadmin') {
+      setActiveSection('clients')
+    }
+  }, [user])
 
   return (
     <ProtectedRoute>

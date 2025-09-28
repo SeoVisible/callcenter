@@ -1,12 +1,14 @@
-export type Currency = 'USD' | 'CHF'
+export type Currency = 'USD' | 'CHF' | 'EUR'
 
-export function formatCurrency(amount: number, currency: Currency = 'USD') {
+export function formatCurrency(amount: number, currency: Currency = 'EUR') {
   try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount)
+    // Use German locale to render Euro amounts consistently for the German UI
+    return new Intl.NumberFormat('de-DE', { style: 'currency', currency }).format(amount)
   } catch {
     // Fallback to manual formatting
-    const symbol = currency === 'CHF' ? 'CHF' : '$'
+    const symbol = currency === 'CHF' ? 'CHF' : currency === 'EUR' ? '€' : '$'
     return `${symbol}${amount.toFixed(2)}`
   }
 }
-export const DEFAULT_CURRENCY: Currency = 'CHF'
+
+export const DEFAULT_CURRENCY: Currency = 'EUR'

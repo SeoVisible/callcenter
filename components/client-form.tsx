@@ -225,7 +225,7 @@ export function ClientForm({ client, onSuccess, onCancel, onViewInvoice }: Clien
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="city">Stadt</Label>
                 <Input
@@ -233,17 +233,6 @@ export function ClientForm({ client, onSuccess, onCancel, onViewInvoice }: Clien
                   value={formData.address.city}
                   onChange={(e) => handleAddressChange("city", e.target.value)}
                   placeholder="Stadt eingeben"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="state">Bundesland/Region</Label>
-                <Input
-                  id="state"
-                  value={formData.address.state}
-                  onChange={(e) => handleAddressChange("state", e.target.value)}
-                  placeholder="Bundesland/Region eingeben"
                   required
                 />
               </div>
