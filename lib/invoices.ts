@@ -83,9 +83,23 @@ class InvoiceService {
   }
 
   async getInvoiceById(id: string): Promise<Invoice | null> {
-    const res = await fetch(`/api/invoices/${id}`, { credentials: "include" })
-    if (!res.ok) return null
-    return res.json()
+    // First try the dedicated endpoint (may not be implemented in all deployments)
+    try {
+      const res = await fetch(`/api/invoices/${id}`, { credentials: "include" })
+      if (res.ok) return res.json()
+    } catch (e) {
+      // ignore and fall back to list search
+    }
+
+    // Fallback: fetch the invoices list and find the invoice by id
+    try {
+      const listRes = await fetch(`/api/invoices`, { credentials: "include" })
+      if (!listRes.ok) return null
+      const all: Invoice[] = await listRes.json()
+      return all.find((inv) => inv.id === id) ?? null
+    } catch (e) {
+      return null
+    }
   }
 
   async createInvoice(invoiceData: CreateInvoiceData): Promise<Invoice> {

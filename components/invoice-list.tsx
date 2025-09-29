@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client"
 
 import { useState, useEffect } from "react"
@@ -224,7 +225,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
 
     const colors: Record<string,string> = {
       pending: "bg-gray-100 text-gray-800",
-      maker: "bg-amber-100 text-amber-800",
+      maker: "bg-amber-200 text-amber-900",
       sent: "bg-blue-100 text-blue-800",
       paid: "bg-green-100 text-green-800",
       not_paid: "bg-red-100 text-red-800",
@@ -236,9 +237,11 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
     }
     // Format status label (handle underscores like not_paid -> Not Paid)
     const label = typeof status === 'string' ? formatStatusLabel(status) : 'Unbekannt'
+    // Replace the 'maker' label with a clearer 'Entwurf' for German UI
+    const displayLabel = status === 'maker' ? 'Entwurf' : label
     return (
       <Badge variant={variants[status]} className={colors[status]}>
-        {label}
+        {displayLabel}
       </Badge>
     )
   }
@@ -346,10 +349,11 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
 
   doc.setFontSize(10)
   // render company/contact info starting at computed Y so it won't collide with the logo
-  doc.text('Kompakt GmbH', rightX, infoStartY)
-  doc.text('Josef-Schrögel-Str. 68', rightX, infoStartY + 12)
-  doc.text('52349 Düren', rightX, infoStartY + 24)
-  doc.text('Tel: 02421 / 95 90 176', rightX, infoStartY + 36)
+  // Use Pro Arbeitsschutz address (PDF-only)
+  doc.text('Pro Arbeitsschutz', rightX, infoStartY)
+  doc.text('Dieselstraße 6–8', rightX, infoStartY + 12)
+  doc.text('63165 Mühlheim am Main', rightX, infoStartY + 24)
+  doc.text('Tel: 06108 7973692', rightX, infoStartY + 36)
   // PDF header email updated to pro domain (PDF-only)
   doc.text('info@pro-arbeitsschutz.de', rightX, infoStartY + 48)
 
@@ -400,22 +404,6 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
       return [String(qty), sku, item.productName + (item.description ? `\n${item.description}` : '')]
     })
 
-    autoTable(doc, {
-      startY: clientY + 80,
-      head: [head],
-      body,
-      headStyles: { fillColor: [245, 245, 245], textColor: 40, fontStyle: 'bold' },
-      styles: { cellPadding: 6, overflow: 'linebreak' },
-      columnStyles: {
-        0: { cellWidth: 50, halign: 'right' },
-        1: { cellWidth: 60, halign: 'left' },
-        2: { cellWidth: 260 },
-        3: { cellWidth: 80, halign: 'right' },
-        4: { cellWidth: 80, halign: 'right' }
-      },
-      bodyStyles: { fontSize: 10, valign: 'middle' }
-    })
-
     interface DocWithAutoTable {
       lastAutoTable?: { finalY: number }
       internal: {
@@ -428,6 +416,52 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
       }
       addPage?: () => void
     }
+
+    const internalForTable = (doc as unknown as DocWithAutoTable).internal
+    const pageW = typeof internalForTable.pageSize.getWidth === 'function'
+      ? internalForTable.pageSize.getWidth()
+      : (internalForTable.pageSize.width ?? 595)
+    const rightMarginForTable = 60
+    const availableWidth = Math.max(pageW - leftX - rightMarginForTable, 300)
+
+  let columnStyles: Record<string, unknown>
+    if (showPrices) {
+      const w0 = 50
+      const w1 = 60
+      const w3 = 80
+      const w4 = 80
+      const descW = Math.max(availableWidth - (w0 + w1 + w3 + w4), 120)
+      columnStyles = {
+        '0': { cellWidth: w0, halign: 'right' },
+        '1': { cellWidth: w1, halign: 'left' },
+        '2': { cellWidth: descW },
+        '3': { cellWidth: w3, halign: 'right' },
+        '4': { cellWidth: w4, halign: 'right' }
+      }
+    } else {
+      const w0 = 60
+      const w1 = 80
+      const descW = Math.max(availableWidth - (w0 + w1), 180)
+      columnStyles = {
+        '0': { cellWidth: w0, halign: 'right' },
+        '1': { cellWidth: w1, halign: 'left' },
+        '2': { cellWidth: descW }
+      }
+    }
+
+  // TS typing for jspdf-autotable's columnStyles is complex; ignore here to avoid type errors
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore
+  autoTable(doc, {
+      startY: clientY + 80,
+      head: [head],
+      body,
+      headStyles: { fillColor: [245, 245, 245], textColor: 40, fontStyle: 'bold' },
+      styles: { cellPadding: 6, overflow: 'linebreak' },
+      // autoTable expects a string-indexed map for columnStyles
+  columnStyles: columnStyles as any,
+      bodyStyles: { fontSize: 10, valign: 'middle' }
+    })
 
     const finalY = ((doc as unknown as DocWithAutoTable).lastAutoTable?.finalY) || (clientY + 180)
 
@@ -486,10 +520,10 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
       const bankIbanRaw = 'DE90506521240008142622' // from provided image: DE90 5065 2124 0008 1426 22
       const bankBic = 'HELADEF1SLS' // visible on provided attachment
       const serviceHotline = '+49 89 411 3' // partial as visible on image; kept in PDF footer
-      const companyLine = 'Kompakt GmbH — Josef-Schrögel-Str. 68, 52349 Düren'
+      const companyLine = 'Pro Arbeitsschutz — Dieselstraße 6–8, 63165 Mühlheim am Main'
       const ibanLine = `IBAN: ${formatIban(bankIbanRaw)}  |  BIC: ${bankBic}`
-      const contactLine = `Servicehotline: ${serviceHotline}  — info@pro-arbeitsschutz.de`
-      const website = 'www.pro-arbeitsschutz.de'
+      const contactLine = `Tel: 06108 7973692  — E-Mail: info@pro-arbeitsschutz.de`
+  const website = 'www.pro-arbeitsschutz.de'
 
       const internal = (doc as unknown as DocWithAutoTable).internal
       const pageWidth = typeof internal.pageSize.getWidth === 'function'
@@ -502,11 +536,20 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
       const rightMargin = 40
       const maxWidth = pageWidth - leftX - rightMargin
 
+      // PDF-only signature block (show only the full signature/address once)
+      const signatureLines = [
+        'Mit freundlichen Grüßen',
+        '',
+        'Pro Arbeitsschutz',
+        'Dieselstraße 6–8',
+        '63165 Mühlheim am Main',
+        'Tel: 06108 7973692',
+        'E-Mail: info@pro-arbeitsschuz.de',
+      ]
       const lines: string[] = []
-      lines.push(...doc.splitTextToSize(companyLine, maxWidth))
-      lines.push(...doc.splitTextToSize(ibanLine, maxWidth))
-      lines.push(...doc.splitTextToSize(contactLine, maxWidth))
-      lines.push(...doc.splitTextToSize(website, maxWidth))
+      for (const s of signatureLines) {
+        lines.push(...doc.splitTextToSize(s, maxWidth))
+      }
 
       const lineHeight = 12
       const totalHeight = lines.length * lineHeight
@@ -520,7 +563,12 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
         footerStartY = 60
       }
 
-      doc.text(lines, leftX, footerStartY)
+      // Draw footer signature lines one-by-one to avoid overlapping and allow clearer spacing
+      let y = footerStartY
+      for (const l of lines) {
+        doc.text(String(l), leftX, y)
+        y += lineHeight
+      }
     
 
     const filename = showPrices ? `invoice-${invoice.id}.pdf` : `invoice-${invoice.id}-no-prices.pdf`;
@@ -770,21 +818,24 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
       </Card>
 
       <AlertDialog open={!!deleteInvoice} onOpenChange={() => setDeleteInvoice(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Rechnung löschen</AlertDialogTitle>
-            <AlertDialogDescription>
-              Sind Sie sicher, dass Sie die Rechnung &quot;{deleteInvoice?.invoiceNumber}&quot; löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} disabled={deleting}>
-              {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Löschen
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
+        <AlertDialogContent className="max-w-2xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Rechnung löschen</AlertDialogTitle>
+              <AlertDialogDescription>
+                Sind Sie sicher, dass Sie die Rechnung &quot;{deleteInvoice?.invoiceNumber || deleteInvoice?.id?.slice(0,8)}&quot; löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="px-6">
+              <p className="text-sm text-muted-foreground">Diese Aktion entfernt die Rechnung dauerhaft aus dem System. Falls die Rechnung an einen Kunden gesendet wurde, bleibt die Kommunikation beim Kunden davon unberührt.</p>
+            </div>
+            <AlertDialogFooter className="gap-3">
+              <AlertDialogCancel className="px-4">Abbrechen</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-destructive text-white px-4">
+                {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Löschen
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
       </AlertDialog>
     </>
   )

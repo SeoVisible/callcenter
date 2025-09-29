@@ -19,7 +19,7 @@ export function DashboardLayout({ children, activeSection, onSectionChange }: Da
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const navigationItems = [
-  { id: "dashboard", label: "Übersicht", icon: FileText, roles: ["superadmin"] },
+  { id: "dashboard", label: "Übersicht", icon: FileText, roles: ["superadmin", "user"] },
     // Only show User Management to superadmin in production environment
     { id: "users", label: "Benutzerverwaltung", icon: Users, roles: ["superadmin"] },
     { id: "products", label: "Produkte", icon: Package, roles: ["superadmin", "user"] },

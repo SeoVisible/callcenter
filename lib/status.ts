@@ -3,7 +3,7 @@ export function formatStatusLabel(s: string | undefined | null) {
   const key = String(s)
   const map: Record<string, string> = {
     pending: 'Ausstehend',
-    maker: 'In Bearbeitung',
+    maker: 'Entwurf',
     sent: 'Versendet',
     paid: 'Bezahlt',
     not_paid: 'Nicht bezahlt',

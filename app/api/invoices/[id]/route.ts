@@ -113,3 +113,28 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
   await prisma.invoice.delete({ where: { id } })
   return NextResponse.json({ success: true })
 }
+
+export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params
+
+  const found = await prisma.invoice.findUnique({
+    where: { id },
+    include: { lineItems: true, client: true },
+  })
+
+  if (!found) {
+    return NextResponse.json({ error: "Invoice not found" }, { status: 404 })
+  }
+
+  const { subtotal, taxAmount, total, lineItemsWithTotal } = computeTotals(found as InvoiceWithRelations)
+
+  return NextResponse.json(
+    addClientFields({
+      ...found,
+      subtotal,
+      taxAmount,
+      total,
+      lineItems: lineItemsWithTotal,
+    })
+  )
+}

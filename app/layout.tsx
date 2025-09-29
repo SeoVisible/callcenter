@@ -7,7 +7,7 @@ import "./globals.css"
 import { Toaster } from "@/components/ui/sonner"
 
 export const metadata: Metadata = {
-  title: "v0 App",
+  title: "Pro Arbetisschutz — CRM",
   description: "Created with v0",
   generator: "v0.app",
 }

@@ -94,7 +94,6 @@ export function UserList({ onAddUser, onEditUser }: UserListProps) {
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
-                <TableHead>Created</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -104,9 +103,8 @@ export function UserList({ onAddUser, onEditUser }: UserListProps) {
                   <TableCell className="font-medium">{user.name}</TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
-                    <Badge variant={user.role === "superadmin" ? "default" : "secondary"}>{user.role}</Badge>
-                  </TableCell>
-                  <TableCell>{new Date(user.createdAt).toLocaleDateString()}</TableCell>
+                      <Badge variant={user.role === "superadmin" ? "default" : "secondary"}>{user.role}</Badge>
+                    </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
                       <Button variant="outline" size="sm" onClick={() => onEditUser(user)}>

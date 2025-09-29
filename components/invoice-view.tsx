@@ -35,7 +35,7 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
   const getStatusBadge = (status: Invoice["status"]) => {
     const colors: Record<string,string> = {
       pending: "bg-gray-100 text-gray-800",
-      maker: "bg-amber-100 text-amber-800",
+      maker: "bg-amber-200 text-amber-900",
       sent: "bg-blue-100 text-blue-800",
       paid: "bg-green-100 text-green-800",
       not_paid: "bg-red-100 text-red-800",
@@ -150,10 +150,11 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
 
   doc.setFontSize(10)
   // render company/contact info starting at computed Y so it won't collide with the logo
-  doc.text('Kompakt GmbH', rightX, infoStartY)
-  doc.text('Josef-Schrögel-Str. 68', rightX, infoStartY + 12)
-  doc.text('52349 Düren', rightX, infoStartY + 24)
-  doc.text('Tel: 02421 / 95 90 176', rightX, infoStartY + 36)
+  // Use Pro Arbeitsschutz address (PDF-only)
+  doc.text('Pro Arbeitsschutz', rightX, infoStartY)
+  doc.text('Dieselstraße 6–8', rightX, infoStartY + 12)
+  doc.text('63165 Mühlheim am Main', rightX, infoStartY + 24)
+  doc.text('Tel: 06108 7973692', rightX, infoStartY + 36)
   // PDF header email updated to pro domain (PDF-only)
   doc.text('info@pro-arbeitsschutz.de', rightX, infoStartY + 48)
 
@@ -188,7 +189,7 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
   // Items table
     const head = showPrices ? ['Menge', 'Art.Nr.', 'Bezeichnung', 'Einzelpreis', 'Gesamt'] : ['Menge', 'Art.Nr.', 'Bezeichnung']
     const body = invoice.lineItems.map((item) => {
-      const sku = (item as any).sku || ''
+      const sku = (item as any)?.sku ?? ''
       const qty = Number(item.quantity ?? 0)
       const unit = Number(item.unitPrice ?? 0)
       const lineTotal = qty * unit
@@ -198,19 +199,59 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
       return [String(qty), sku, item.productName + (item.description ? `\n${item.description}` : '')]
     })
 
+    // compute page dimensions and dynamic column widths so tables span the page nicely
+    interface DocWithAutoTable {
+      lastAutoTable?: { finalY: number }
+      internal: {
+        pageSize: {
+          getHeight?: () => number
+          getWidth?: () => number
+          height?: number
+          width?: number
+        }
+      }
+      addPage?: () => void
+    }
+
+    const internalForTable = (doc as unknown as DocWithAutoTable).internal
+    const pageW = typeof internalForTable.pageSize.getWidth === 'function'
+      ? internalForTable.pageSize.getWidth()
+      : (internalForTable.pageSize.width ?? 595)
+    const rightMarginForTable = 60
+    const availableWidth = Math.max(pageW - leftX - rightMarginForTable, 300)
+
+    let columnStyles: Record<string, any>
+    if (showPrices) {
+      const w0 = 50 // qty
+      const w1 = 60 // sku
+      const w3 = 80 // unit price
+      const w4 = 80 // total
+      const descW = Math.max(availableWidth - (w0 + w1 + w3 + w4), 120)
+      columnStyles = {
+        '0': { cellWidth: w0, halign: 'right' },
+        '1': { cellWidth: w1, halign: 'left' },
+        '2': { cellWidth: descW },
+        '3': { cellWidth: w3, halign: 'right' },
+        '4': { cellWidth: w4, halign: 'right' }
+      }
+    } else {
+      const w0 = 60
+      const w1 = 80
+      const descW = Math.max(availableWidth - (w0 + w1), 120)
+      columnStyles = {
+        '0': { cellWidth: w0, halign: 'right' },
+        '1': { cellWidth: w1, halign: 'left' },
+        '2': { cellWidth: descW }
+      }
+    }
+
     autoTable(doc, {
       startY: clientY + 80,
       head: [head],
       body,
-  headStyles: { fillColor: [245, 245, 245], textColor: 40, fontStyle: 'bold' },
-  styles: { cellPadding: 6, overflow: 'linebreak' },
-      columnStyles: {
-        0: { cellWidth: 50, halign: 'right' },
-        1: { cellWidth: 60, halign: 'left' },
-        2: { cellWidth: 260 },
-        3: { cellWidth: 80, halign: 'right' },
-        4: { cellWidth: 80, halign: 'right' }
-      },
+      headStyles: { fillColor: [245, 245, 245], textColor: 40, fontStyle: 'bold' },
+      styles: { cellPadding: 6, overflow: 'linebreak' },
+      columnStyles,
       bodyStyles: { fontSize: 10, valign: 'middle' }
     })
 
@@ -291,23 +332,27 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
   const rightMargin = 40
     const maxWidth = pageWidth - leftX - rightMargin
 
-    const companyLine = 'Kompakt GmbH — Josef-Schrögel-Str. 68, 52349 Düren'
-    const ibanLine = `IBAN: ${formatIban(bankIbanRaw)}  |  BIC: ${bankBic}`
-    const contactLine = `Servicehotline: ${serviceHotline}  — info@pro-arbeitsschutz.de`
-
-    // split lines to fit page width and compute a safe Y so footer doesn't overlap table/totals
+    // PDF-only closing/signature block (show only the full signature/address once)
+    const signatureLines = [
+      'Mit freundlichen Grüßen',
+      '',
+      'Pro Arbeitsschutz',
+      'Dieselstraße 6–8',
+      '63165 Mühlheim am Main',
+      'Tel: 06108 7973692',
+      'E-Mail: info@pro-arbeitsschutz.de',
+    ]
     const lines: string[] = []
-    lines.push(...doc.splitTextToSize(companyLine, maxWidth))
-    lines.push(...doc.splitTextToSize(ibanLine, maxWidth))
-    lines.push(...doc.splitTextToSize(contactLine, maxWidth))
-    lines.push(...doc.splitTextToSize(website, maxWidth))
+    for (const s of signatureLines) {
+      lines.push(...doc.splitTextToSize(s, maxWidth))
+    }
 
     // estimate line height (pts). 9pt font roughly 12pt line height
     const lineHeight = 12
     const totalHeight = lines.length * lineHeight
     const bottomMargin = 40
 
-    // Preferred Y to place footer so it fits above the bottom margin
+  // Preferred Y to place footer so it fits above the bottom margin
     let footerStartY = pageHeight - bottomMargin - totalHeight
 
     // If footer would overlap the invoice content/totals area, move it to a new page
@@ -318,8 +363,12 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
       footerStartY = 60
     }
 
-    // render wrapped lines starting at computed Y
-    doc.text(lines, leftX, footerStartY)
+    // render wrapped lines starting at computed Y — draw per-line to avoid overlapping
+    let y = footerStartY
+    for (const l of lines) {
+      doc.text(String(l), leftX, y)
+      y += lineHeight
+    }
 
   const filename = showPrices ? `invoice-${invoice.id}.pdf` : `invoice-${invoice.id}-no-prices.pdf`;
   // debug markers so we can confirm the client generator is executed in the browser
@@ -333,6 +382,19 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
 
   return (
     <div className="space-y-6">
+      {invoice.status === 'maker' && (
+        <div className="p-4 rounded-md bg-amber-50 border border-amber-200 text-amber-800">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-semibold uppercase">Entwurf</div>
+              <div className="text-xs">Diese Rechnung ist als Entwurf markiert und noch nicht finalisiert. Verwenden Sie &quot;Bearbeiten&quot;, um Änderungen vorzunehmen.</div>
+            </div>
+            <div>
+              <Button variant="ghost" onClick={onEdit}>Bearbeiten</Button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">

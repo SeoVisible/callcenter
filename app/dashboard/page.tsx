@@ -13,6 +13,7 @@ import { ClientForm } from "@/components/client-form"
 import { InvoiceList } from "@/components/invoice-list"
 import { InvoiceForm } from "@/components/invoice-form"
 import { InvoiceView } from "@/components/invoice-view"
+import { invoiceService } from "@/lib/invoices"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { DashboardHome } from "@/components/dashboard-home"
 import dynamic from 'next/dynamic'
@@ -119,8 +120,19 @@ export default function DashboardPage() {
     setShowInvoiceForm(true)
   }
 
-  const handleEditInvoice = (invoice: Invoice) => {
-    setEditingInvoice(invoice)
+  const handleEditInvoice = async (invoice: Invoice) => {
+    // Ensure we have the most recent/full invoice payload (line items, dates)
+    try {
+      const full = await invoiceService.getInvoiceById(invoice.id)
+      if (full) {
+        setEditingInvoice(full)
+      } else {
+        setEditingInvoice(invoice)
+      }
+    } catch (e) {
+      // fallback to provided invoice
+      setEditingInvoice(invoice)
+    }
     setViewingInvoice(undefined)
     setShowInvoiceForm(true)
   }
@@ -147,12 +159,17 @@ export default function DashboardPage() {
     setViewingInvoice(undefined)
   }
 
-  const handleInvoiceViewEdit = () => {
-    if (viewingInvoice) {
+  const handleInvoiceViewEdit = async () => {
+    if (!viewingInvoice) return
+    try {
+      const full = await invoiceService.getInvoiceById(viewingInvoice.id)
+      if (full) setEditingInvoice(full)
+      else setEditingInvoice(viewingInvoice)
+    } catch (e) {
       setEditingInvoice(viewingInvoice)
-      setShowInvoiceForm(true)
-      setViewingInvoice(undefined)
     }
+    setShowInvoiceForm(true)
+    setViewingInvoice(undefined)
   }
 
   const renderContent = () => {
@@ -224,22 +241,22 @@ export default function DashboardPage() {
 
     // Default dashboard view: show DashboardHome (graphs/statistics)
     // Prevent non-superadmin users from seeing DashboardHome: show Clients instead.
-    if (activeSection === "dashboard") {
-      if (user?.role !== "superadmin") {
-        // normal users should see Clients instead of DashboardHome
-        if (showClientForm) {
-          return (
-            <ClientForm
-              client={editingClient}
-              onSuccess={handleClientFormSuccess}
-              onCancel={handleClientFormCancel}
-              onViewInvoice={handleViewInvoice}
-            />
-          )
-        }
-        return <ClientList onAddClient={handleAddClient} onEditClient={handleEditClient} />
+      if (activeSection === "dashboard") {
+      // Always show the DashboardHome but let it decide whether to display
+      // full statistics or a lightweight quick-links view based on role.
+      if (showClientForm) {
+        return (
+          <ClientForm
+            client={editingClient}
+            onSuccess={handleClientFormSuccess}
+            onCancel={handleClientFormCancel}
+            onViewInvoice={handleViewInvoice}
+          />
+        )
       }
-      return <DashboardHome />
+      return (
+        <DashboardHome showStats={user?.role === 'superadmin'} onNavigate={setActiveSection} />
+      )
     }
   }
 
@@ -249,12 +266,8 @@ export default function DashboardPage() {
     if (paramFilterUserId) setActiveSection("invoices")
   }, [paramFilterUserId])
 
-  // Ensure non-superadmin users never see the dashboard: default them to the clients section.
-  useEffect(() => {
-    if (user && user.role !== 'superadmin') {
-      setActiveSection('clients')
-    }
-  }, [user])
+  // Note: don't force non-superadmin users away from the dashboard anymore.
+  // DashboardHome will render a compact quick-links view when `showStats` is false.
 
   return (
     <ProtectedRoute>

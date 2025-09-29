@@ -15,7 +15,7 @@ interface Stats {
   productsByScope: { global: number; personal: number }
 }
 
-export function DashboardHome() {
+export function DashboardHome({ showStats = true, onNavigate }: { showStats?: boolean; onNavigate?: (section: string) => void }) {
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -194,6 +194,67 @@ export function DashboardHome() {
   // Simple pie data for product scope
   const totalScope = productsByScope.global + productsByScope.personal || 1
   const globalAngle = (productsByScope.global / totalScope) * 360
+
+  // If showStats is false (normal users), render a compact quick-links dashboard
+  if (!showStats) {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Kunden</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{clients}</div>
+              <div className="text-sm text-muted-foreground">Gesamt Kunden</div>
+              <div className="mt-4">
+                <Button onClick={() => onNavigate && onNavigate('clients')}>Kunden anzeigen</Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Rechnungen</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{invoices}</div>
+              <div className="text-sm text-muted-foreground">Gesamt Rechnungen</div>
+              <div className="mt-4">
+                <Button onClick={() => onNavigate && onNavigate('invoices')}>Rechnungen anzeigen</Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Produkte</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{products}</div>
+              <div className="text-sm text-muted-foreground">Gesamt Produkte</div>
+              <div className="mt-4">
+                <Button onClick={() => onNavigate && onNavigate('products')}>Produkte anzeigen</Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Benutzer</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{users}</div>
+              <div className="text-sm text-muted-foreground">Gesamt Benutzerkonten</div>
+              <div className="mt-4">
+                <Button onClick={() => onNavigate && onNavigate('users')}>Benutzer anzeigen</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

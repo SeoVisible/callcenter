@@ -64,8 +64,10 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
 
   useEffect(() => {
     if (invoice) {
+      // Ensure we pick up client id whether it's stored as clientId
+      const invoiceClientId = invoice?.clientId ?? ""
       setFormData({
-        clientId: invoice.clientId,
+        clientId: invoiceClientId,
         dueDate: invoice.dueDate ? invoice.dueDate.split("T")[0] : "",
         taxRate: invoice.taxRate,
         notes: invoice.notes,
@@ -111,11 +113,19 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
   console.debug("InvoiceForm.loadData: products", Array.isArray(productsData) ? productsData.length : typeof productsData)
       setClients(clientsData)
       setProducts(productsData)
+      // If we're editing an invoice but the clients were loaded after invoice
+      // ensure the client select is initialized from the invoice data
+      if (invoice) {
+        const invoiceClientId = invoice?.clientId ?? ""
+        if (invoiceClientId && !formData.clientId) {
+          setFormData((prev) => ({ ...prev, clientId: invoiceClientId }))
+        }
+      }
       // When creating a new invoice we do not auto-insert shipping here anymore.
       // Shipping can be added manually via the "Add Shipping" button.
     } catch {
-      toast.error("Error", {
-        description: "Failed to load data",
+      toast.error("Fehler", {
+        description: "Fehler beim Laden der Daten",
       })
     }
   }
@@ -285,7 +295,7 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
           if (item.productId) {
             const prod = products.find((p) => p.id === item.productId)
             if (prod && item.unitPrice < prod.price) {
-              setError(`Unit price for "${item.productName}" cannot be lower than product price (${formatCurrency(prod.price, DEFAULT_CURRENCY)})`)
+              setError(`Der Einzelpreis für "${item.productName}" darf nicht unter dem Produktpreis liegen (${formatCurrency(prod.price, DEFAULT_CURRENCY)})`)
               setLoading(false)
               return
             }
@@ -313,7 +323,7 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
       }
       onSuccess()
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Operation failed")
+      setError(err instanceof Error ? err.message : "Vorgang fehlgeschlagen")
     } finally {
       setLoading(false)
     }
@@ -567,10 +577,10 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
           <div className="flex gap-2">
             <Button type="submit" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {invoice ? "Update Invoice" : "Create Invoice"}
+              {invoice ? "Rechnung aktualisieren" : "Rechnung erstellen"}
             </Button>
             <Button type="button" variant="outline" onClick={onCancel}>
-              Cancel
+              Stornieren
             </Button>
           </div>
         </form>
