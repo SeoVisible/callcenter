@@ -110,8 +110,15 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
 
 export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params
-  await prisma.invoice.delete({ where: { id } })
-  return NextResponse.json({ success: true })
+  try {
+    // Remove dependent invoice items first to satisfy FK constraints
+    await prisma.invoiceItem.deleteMany({ where: { invoiceId: id } })
+    await prisma.invoice.delete({ where: { id } })
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    console.error(err)
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Failed to delete invoice' }, { status: 500 })
+  }
 }
 
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
