@@ -35,7 +35,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 	doc.fontSize(10).text('Kompakt GmbH', rightX, yBase)
 	doc.text('Josef-Schrögel-Str. 68', rightX, yBase + 12)
 	doc.text('52349 Düren', rightX, yBase + 24)
-	doc.text('Tel: 02421 / 95 90 176', rightX, yBase + 36)
+	doc.text('Tel: +4961089944981', rightX, yBase + 36)
 	doc.text('info@pro-arbeitsschutz.de', rightX, yBase + 48)
 	// Footer: wrap lines and place above bottom margin, move to new page if not enough room
 	const footerLines = [

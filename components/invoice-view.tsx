@@ -154,7 +154,7 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
   doc.text('Pro Arbeitsschutz', rightX, infoStartY)
   doc.text('Dieselstraße 6–8', rightX, infoStartY + 12)
   doc.text('63165 Mühlheim am Main', rightX, infoStartY + 24)
-  doc.text('Tel: 06108 7973692', rightX, infoStartY + 36)
+  doc.text('Tel: +4961089944981', rightX, infoStartY + 36)
   // PDF header email updated to pro domain (PDF-only)
   doc.text('info@pro-arbeitsschutz.de', rightX, infoStartY + 48)
 
@@ -339,7 +339,7 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
       'Pro Arbeitsschutz',
       'Dieselstraße 6–8',
       '63165 Mühlheim am Main',
-      'Tel: 06108 7973692',
+      'Tel: +4961089944981',
       'E-Mail: info@pro-arbeitsschutz.de',
     ]
     const lines: string[] = []

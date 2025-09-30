@@ -30,7 +30,7 @@ async function generate() {
   doc.text('Berufsbekleidung von Kopf bis Fuß', companyX, doc.y + 2)
   doc.text('Kompakt GmbH', companyX, doc.y + 6)
   doc.text('Josef-Schregel-Str. 68, 52349 Düren', companyX)
-  doc.text('Tel: 02421 / 95 90 176', companyX)
+  doc.text('Tel: +4961089944981', companyX)
   doc.text('info@kompakt-arbeitsschutz.de', companyX)
 
   // Invoice meta

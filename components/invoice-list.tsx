@@ -353,7 +353,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
   doc.text('Pro Arbeitsschutz', rightX, infoStartY)
   doc.text('Dieselstraße 6–8', rightX, infoStartY + 12)
   doc.text('63165 Mühlheim am Main', rightX, infoStartY + 24)
-  doc.text('Tel: 06108 7973692', rightX, infoStartY + 36)
+  doc.text('Tel: +4961089944981', rightX, infoStartY + 36)
   // PDF header email updated to pro domain (PDF-only)
   doc.text('info@pro-arbeitsschutz.de', rightX, infoStartY + 48)
 
@@ -522,7 +522,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
       const serviceHotline = '+49 89 411 3' // partial as visible on image; kept in PDF footer
       const companyLine = 'Pro Arbeitsschutz — Dieselstraße 6–8, 63165 Mühlheim am Main'
       const ibanLine = `IBAN: ${formatIban(bankIbanRaw)}  |  BIC: ${bankBic}`
-      const contactLine = `Tel: 06108 7973692  — E-Mail: info@pro-arbeitsschutz.de`
+      const contactLine = `Tel: +4961089944981  — E-Mail: info@pro-arbeitsschutz.de`
   const website = 'www.pro-arbeitsschutz.de'
 
       const internal = (doc as unknown as DocWithAutoTable).internal
@@ -543,7 +543,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
         'Pro Arbeitsschutz',
         'Dieselstraße 6–8',
         '63165 Mühlheim am Main',
-        'Tel: 06108 7973692',
+        'Tel: +4961089944981',
         'E-Mail: info@pro-arbeitsschuz.de',
       ]
       const lines: string[] = []
