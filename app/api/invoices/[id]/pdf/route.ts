@@ -32,9 +32,9 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 	// Company block
 	const rightX = 420
 	const yBase = 40
-	doc.fontSize(10).text('Kompakt GmbH', rightX, yBase)
-	doc.text('Josef-Schrögel-Str. 68', rightX, yBase + 12)
-	doc.text('52349 Düren', rightX, yBase + 24)
+	doc.fontSize(10).text('Pro Arbeitsschutz', rightX, yBase)
+	doc.text('Dieselstraße 6–8', rightX, yBase + 12)
+	doc.text('63165 Mühlheim am Main', rightX, yBase + 24)
 	doc.text('Tel: +4961089944981', rightX, yBase + 36)
 	doc.text('info@pro-arbeitsschutz.de', rightX, yBase + 48)
 	// Footer: wrap lines and place above bottom margin, move to new page if not enough room
@@ -82,7 +82,16 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 	doc.fontSize(11).fillColor('#000').text('Rechnung an:')
 	doc.fontSize(10).text(invoice.client?.name || '')
 	if (invoice.client?.company) doc.text(invoice.client.company)
-	if (invoice.client?.email) doc.text(invoice.client.email)
+	// Add client address
+	const clientAddress = invoice.client?.address as any
+	if (clientAddress?.street) doc.text(String(clientAddress.street))
+	if (clientAddress?.zipCode || clientAddress?.city) {
+		const cityLine = [clientAddress.zipCode, clientAddress.city].filter(Boolean).join(' ')
+		if (cityLine) doc.text(cityLine)
+	}
+	if (clientAddress?.country && clientAddress.country !== 'Germany' && clientAddress.country !== 'Deutschland') {
+		doc.text(String(clientAddress.country))
+	}
 
 	// move to right column for meta
 	const metaX = 360

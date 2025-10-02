@@ -173,7 +173,16 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
     doc.setFontSize(10)
     doc.text(invoice.clientName || '', leftX, clientY + 14)
     if (invoice.clientCompany) doc.text(invoice.clientCompany, leftX, clientY + 28)
-    if (invoice.clientEmail) doc.text(invoice.clientEmail, leftX, clientY + 42)
+    // Add client address
+    const client = (invoice as any).client
+    if (client?.address?.street) doc.text(client.address.street, leftX, clientY + 42)
+    if (client?.address?.zipCode || client?.address?.city) {
+      const cityLine = [client.address.zipCode, client.address.city].filter(Boolean).join(' ')
+      if (cityLine) doc.text(cityLine, leftX, clientY + 56)
+    }
+    if (client?.address?.country && client.address.country !== 'Germany' && client.address.country !== 'Deutschland') {
+      doc.text(client.address.country, leftX, clientY + 70)
+    }
 
     const metaX = 360
     doc.setFontSize(10)
@@ -341,6 +350,7 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
       '63165 Mühlheim am Main',
       'Tel: +4961089944981',
       'E-Mail: info@pro-arbeitsschutz.de',
+      'IBAN: DE90 5065 2124 0008 1426 22',
     ]
     const lines: string[] = []
     for (const s of signatureLines) {
