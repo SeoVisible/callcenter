@@ -162,8 +162,13 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
   doc.setFontSize(20)
   doc.setTextColor(40, 40, 80)
   doc.text('Rechnung', leftX, yBase + 80)
-
-  // Invoice identifier intentionally omitted from page header (kept only in filename)
+  
+  // Invoice number
+  if ((invoice as any).invoiceNumber) {
+    doc.setFontSize(16)
+    doc.setTextColor(60, 60, 60)
+    doc.text(`#${(invoice as any).invoiceNumber}`, leftX, yBase + 100)
+  }
 
   // Client (left) and Invoice meta (right)
   const clientY = yBase + 120

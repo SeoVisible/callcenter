@@ -72,9 +72,10 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 		doc.moveDown(3)
 		doc.fontSize(20).fillColor('#282850').text('Rechnung')
 
-		// Invoice identifier: place near company block (top-right)
+		// Invoice number: place near company block (top-right)
 		const invoiceIdY = yBase + 70
-		doc.fontSize(10).fillColor('#505050').text(`Rechnungs-Nr.: ${invoice.id}`, rightX, invoiceIdY)
+		const invoiceNumber = (invoice as any).invoiceNumber ? `#${(invoice as any).invoiceNumber}` : `#${invoice.id.slice(-6)}`
+		doc.fontSize(10).fillColor('#505050').text(`Rechnungs-Nr.: ${invoiceNumber}`, rightX, invoiceIdY)
 
 	// Client and meta
 	doc.moveDown(1)
@@ -156,10 +157,11 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 	})
 
 		const uint8 = new Uint8Array(buffer)
+		const invoiceNumberForFilename = (invoice as any).invoiceNumber || invoice.id.slice(-6)
 		const headers = new Headers({
 			'Content-Type': 'application/pdf',
 			'Content-Length': String(buffer.length),
-			'Content-Disposition': `attachment; filename="invoice-${invoice.id}.pdf"`,
+			'Content-Disposition': `attachment; filename="invoice-${invoiceNumberForFilename}.pdf"`,
 		})
 		return new Response(uint8, { status: 200, headers })
 }

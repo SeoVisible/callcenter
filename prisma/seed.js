@@ -59,6 +59,7 @@ async function main() {
   // Create an invoice with one line item
   const invoice = await prisma.invoice.create({
     data: {
+      invoiceNumber: '#001',
       clientId: client.id,
       createdBy: user.id,
       dueDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7), // +7 days

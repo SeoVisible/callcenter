@@ -1,0 +1,128 @@
+{
+  "timestamp": "2025-10-03T11:30:42.190Z",
+  "database": "callcenter",
+  "data": {
+    "users": [
+      {
+        "id": "cb0b8732-1e2d-47e4-a035-7172eddc833d",
+        "name": "Admin User",
+        "email": "admin@example.com",
+        "password": "admin",
+        "role": "superadmin"
+      },
+      {
+        "id": "a468d23d-857e-4421-97a5-50a51dbe6001",
+        "name": "Engjell",
+        "email": "Engjell@gmail.com",
+        "password": "123",
+        "role": "user"
+      }
+    ],
+    "clients": [
+      {
+        "id": "30589181-d3a5-4905-8c7e-9ccd4b98248a",
+        "name": "Muhamet Morina",
+        "email": "morina-bau@hotmail.com",
+        "company": "Maler- und Lackier Morina-Bau",
+        "address": {
+          "city": "Bürgermeister-Hainz-Straße 12 63165 Mühlheim am Main",
+          "state": "",
+          "street": "Maler- und Lackier Morina-Bau",
+          "country": "Germany",
+          "zipCode": "63165"
+        },
+        "createdBy": "cb0b8732-1e2d-47e4-a035-7172eddc833d",
+        "notes": "Muhamet Morina",
+        "phone": "+49 07741346322",
+        "createdAt": "2025-10-03T09:35:49.875Z"
+      }
+    ],
+    "products": [
+      {
+        "id": "120eb35e-db0a-4fd7-8a5a-84a94feabc5a",
+        "name": "7153 // MOTION TEXT LIGHT",
+        "description": "7153 // MOTION TEXT LIGHT",
+        "price": 39.99,
+        "category": "Default",
+        "sku": "PROD-001",
+        "createdBy": "cb0b8732-1e2d-47e4-a035-7172eddc833d",
+        "isGlobal": true,
+        "stock": 92,
+        "buyingPrice": 39.99
+      }
+    ],
+    "invoices": [
+      {
+        "id": "30c438ff-453c-4386-9f67-d5a87b55af24",
+        "clientId": "30589181-d3a5-4905-8c7e-9ccd4b98248a",
+        "createdBy": "a468d23d-857e-4421-97a5-50a51dbe6001",
+        "dueDate": "2025-11-02T00:00:00.000Z",
+        "taxRate": 19,
+        "notes": "Invoice",
+        "status": "sent",
+        "createdAt": "2025-10-03T09:46:09.410Z",
+        "updatedAt": "2025-10-03T09:46:16.920Z",
+        "invoiceNumber": "001"
+      }
+    ],
+    "invoiceItems": [
+      {
+        "id": "d09d74b2-aa3f-44d6-929f-87b6475721f0",
+        "invoiceId": "30c438ff-453c-4386-9f67-d5a87b55af24",
+        "productId": null,
+        "productName": "Shipping",
+        "description": "Shipping",
+        "quantity": 1,
+        "unitPrice": 9.95,
+        "buyingPrice": null
+      },
+      {
+        "id": "c3943627-a6af-4a71-bdcf-59b92bf44456",
+        "invoiceId": "30c438ff-453c-4386-9f67-d5a87b55af24",
+        "productId": "120eb35e-db0a-4fd7-8a5a-84a94feabc5a",
+        "productName": "7153 // MOTION TEXT LIGHT",
+        "description": "7153 // MOTION TEXT LIGHT - Gr. L",
+        "quantity": 2,
+        "unitPrice": 39.99,
+        "buyingPrice": 39.99
+      },
+      {
+        "id": "ddd3d2de-0193-4cf2-924d-9446cc5e3965",
+        "invoiceId": "30c438ff-453c-4386-9f67-d5a87b55af24",
+        "productId": "120eb35e-db0a-4fd7-8a5a-84a94feabc5a",
+        "productName": "7153 // MOTION TEXT LIGHT",
+        "description": "7153 // MOTION TEXT LIGHT - Gr. XL",
+        "quantity": 2,
+        "unitPrice": 39.99,
+        "buyingPrice": 39.99
+      },
+      {
+        "id": "0a573ae9-f3a3-494d-b3e2-7e6e740e7060",
+        "invoiceId": "30c438ff-453c-4386-9f67-d5a87b55af24",
+        "productId": "120eb35e-db0a-4fd7-8a5a-84a94feabc5a",
+        "productName": "7153 // MOTION TEXT LIGHT",
+        "description": "7153 // MOTION TEXT LIGHT - Gr. XXL",
+        "quantity": 2,
+        "unitPrice": 39.99,
+        "buyingPrice": 39.99
+      },
+      {
+        "id": "7c9604b7-11d5-472d-b3c9-bc1728179956",
+        "invoiceId": "30c438ff-453c-4386-9f67-d5a87b55af24",
+        "productId": "120eb35e-db0a-4fd7-8a5a-84a94feabc5a",
+        "productName": "7153 // MOTION TEXT LIGHT",
+        "description": "7153 // MOTION TEXT LIGHT - Gr. XXXL",
+        "quantity": 2,
+        "unitPrice": 39.99,
+        "buyingPrice": 39.99
+      }
+    ]
+  },
+  "counts": {
+    "users": 2,
+    "clients": 1,
+    "products": 1,
+    "invoices": 1,
+    "invoiceItems": 5
+  }
+}

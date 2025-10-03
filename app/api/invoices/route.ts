@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from "next/server"
 import { PrismaClient, Invoice as PrismaInvoice, InvoiceItem as PrismaInvoiceItem, Client as PrismaClientType } from "@prisma/client"
+import { generateNextInvoiceNumber } from "@/lib/invoice-number"
 
 const prisma = new PrismaClient()
 
@@ -200,8 +201,12 @@ export async function POST(req: Request) {
           }
         })
 
+        // Generate the next invoice number
+        const invoiceNumber = await generateNextInvoiceNumber();
+        
         const createdInvoice = await prismaTx.invoice.create({
           data: {
+            invoiceNumber: invoiceNumber,
             clientId: data.clientId,
             createdBy: data.createdBy,
             dueDate: new Date(data.dueDate),
