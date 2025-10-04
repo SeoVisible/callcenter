@@ -169,18 +169,22 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
   }
 
   const handleSendInvoice = async (invoice: Invoice) => {
-    if (!user) return
+    // Proceed even if user context is not available; server will enforce auth
+    if (!invoice.clientEmail) {
+      toast.error('Keine Kunden-E-Mail vorhanden. Bitte fügen Sie eine E-Mail-Adresse hinzu.')
+      return
+    }
 
+    toast.info('Sende Rechnungs-E-Mail …')
     setSendingId(invoice.id)
     try {
-      const result = await invoiceService.sendInvoice(invoice.id)
-      // Optionally, show previewUrl or refetch invoices
-      toast.success("Rechnung gesendet!", { description: result.previewUrl ? `Vorschau: ${result.previewUrl}` : undefined })
-      // Optionally, reload invoices to update status
-      void loadInvoices()
-      toast.success(`Rechnung gesendet an ${invoice.clientEmail}`)
+  const result = await invoiceService.sendInvoice(invoice.id)
+  const extra = result.accepted && result.accepted.length ? `\nEmpfänger: ${result.accepted.join(', ')}` : ''
+  const desc = result.previewUrl ? `Vorschau: ${result.previewUrl}` : (result.messageId ? `Nachrichten-ID: ${result.messageId}${extra}` : undefined)
+  toast.success('Rechnung gesendet!', { description: desc })
+  void loadInvoices()
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Fehler beim Senden der Rechnung")
+      toast.error(error instanceof Error ? error.message : 'Fehler beim Senden der Rechnung')
     } finally {
       setSendingId(null)
     }
@@ -353,42 +357,34 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
   doc.text('info@pro-arbeitsschutz.com', rightX, yBase + 33)
 
   // RECHNUNG title at the top left - positioned to match reference image
-  doc.setFontSize(20)
-  doc.setTextColor(0, 0, 0) // Black text
-  doc.text('RECHNUNG', leftX, yBase + 110)
+  // doc.setFontSize(20)
+  // doc.setTextColor(0, 0, 0) // Black text
+  // doc.text('RECHNUNG', leftX, yBase + 110)
 
-  // LEFT SIDE: Client address section
-  const clientY = yBase + 150
-  
-  doc.setFontSize(10)
-  doc.setTextColor(0, 0, 0) // Black text
-  doc.text('Rechnungsadresse:', leftX, clientY)
+  // LEFT SIDE: Client address section (without heading)
+  const clientY = yBase + 110
   
   doc.setFontSize(11)
-  doc.text(invoice.clientName || '', leftX, clientY + 18)
-  if (invoice.clientCompany) doc.text(invoice.clientCompany, leftX, clientY + 32)
+  doc.setTextColor(0, 0, 0) // Black text
+  doc.text(invoice.clientName || '', leftX, clientY)
+  if (invoice.clientCompany) doc.text(invoice.clientCompany, leftX, clientY + 14)
   
   // Add client address with proper spacing
   const client = (invoice as any).client
-  if (client?.address?.street) doc.text(client.address.street, leftX, clientY + 46)
+  if (client?.address?.street) doc.text(client.address.street, leftX, clientY + 28)
   if (client?.address?.zipCode || client?.address?.city) {
     const cityLine = [client.address.zipCode, client.address.city].filter(Boolean).join(' ')
-    if (cityLine) doc.text(cityLine, leftX, clientY + 60)
+    if (cityLine) doc.text(cityLine, leftX, clientY + 42)
   }
   if (client?.address?.country && client.address.country !== 'Germany' && client.address.country !== 'Deutschland') {
-    doc.text(client.address.country, leftX, clientY + 74)
+    doc.text(client.address.country, leftX, clientY + 56)
   }
 
-  // RIGHT SIDE: Invoice information - moved slightly to the left
+  // RIGHT SIDE: Only Auftragsdatum and Rechnungsdatum
   const invoiceInfoX = 420
   doc.setFontSize(10)
   doc.setTextColor(0, 0, 0) // Black text
-  
-  if ((invoice as any).invoiceNumber) {
-    doc.text(`Rechnungsnummer: ${(invoice as any).invoiceNumber}`, invoiceInfoX, clientY)
-  }
 
-  // Continue with invoice dates on the right side
   const safeDate = (d: unknown) => {
     try {
       const dt = new Date(String(d))
@@ -398,11 +394,14 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
   }
   const invoiceDate = safeDate(invoice.issueDate ?? invoice.createdAt)
   const serviceDate = safeDate(invoice.createdAt)
-  const dueDate = safeDate(invoice.dueDate)
-  
-  if (invoiceDate) doc.text(`Rechnungsdatum: ${invoiceDate}`, invoiceInfoX, clientY + 14)
-  if (serviceDate) doc.text(`Leistungsdatum: ${serviceDate}`, invoiceInfoX, clientY + 28)
-  if (dueDate) doc.text(`Fälligkeitsdatum: ${dueDate}`, invoiceInfoX, clientY + 42)
+
+  // Add back invoice number
+  const invNo = (invoice as any).invoiceNumber
+  if (invNo) doc.text(`Rechnungsnummer: ${invNo}`, invoiceInfoX, clientY)
+
+  const line1Y = invNo ? clientY + 14 : clientY
+  if (serviceDate) doc.text(`Auftragsdatum: ${serviceDate}`, invoiceInfoX, line1Y)
+  if (invoiceDate) doc.text(`Rechnungsdatum: ${invoiceDate}`, invoiceInfoX, line1Y + 14)
 
     // Items table - headers matching the invoice view exactly
     const head = showPrices ? ['Pos.', 'Menge', 'Artikel-Bezeichnung', 'Einzelpreis', 'Gesamtpreis'] : ['Pos.', 'Menge', 'Artikel-Bezeichnung']
@@ -721,29 +720,15 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
                               </DropdownMenuItem>
                             )}
                             <DropdownMenuItem
-                              onClick={async () => {
-                                try {
-                                  setSendingId(invoice.id)
-                                  const result = await invoiceService.sendInvoice(invoice.id)
-                                  setSendingId(null)
-                                  if (result.previewUrl) {
-                                    toast.success('Rechnungs-E-Mail gesendet! (Vorschau)', {
-                                      description: (
-                                        <a href={result.previewUrl} target="_blank" rel="noopener noreferrer" className="underline text-blue-600">E-Mail anzeigen</a>
-                                      )
-                                    })
-                                  } else {
-                                    toast.success('Rechnungs-E-Mail gesendet!')
-                                  }
-                                } catch (error) {
-                                  setSendingId(null)
-                                  toast.error(error instanceof Error ? error.message : 'Fehler beim Senden der Rechnungs-E-Mail')
-                                }
-                              }}
+                              onClick={() => handleSendInvoice(invoice)}
                               disabled={sendingId === invoice.id}
                             >
-                              <Send className="mr-2 h-4 w-4" />
-                              Rechnung per E-Mail
+                              {sendingId === invoice.id ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <Send className="mr-2 h-4 w-4" />
+                              )}
+                              Rechnung per E-Mail senden
                             </DropdownMenuItem>
                             {/* Single Download submenu: Client PDF (with prices) and Maker PDF (no prices) */}
                             <DropdownMenuSub>
@@ -759,19 +744,6 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
                                 </DropdownMenuItem>
                               </DropdownMenuSubContent>
                             </DropdownMenuSub>
-                            {canEditInvoice(invoice) && (invoice.status === "pending" || invoice.status === "maker") && (
-                              <DropdownMenuItem
-                                onClick={() => handleSendInvoice(invoice)}
-                                disabled={sendingId === invoice.id}
-                              >
-                                {sendingId === invoice.id ? (
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Send className="mr-2 h-4 w-4" />
-                                )}
-                                Rechnung senden
-                              </DropdownMenuItem>
-                            )}
                             {canEditInvoice(invoice) && (invoice.status === "sent" || invoice.status === "not_paid") && (
                               <DropdownMenuItem
                                 onClick={() => handleMarkAsPaid(invoice)}

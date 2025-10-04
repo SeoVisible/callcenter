@@ -141,16 +141,36 @@ class InvoiceService {
     }
   }
 
-  async sendInvoice(id: string): Promise<{ previewUrl?: string }> {
+  async sendInvoice(id: string): Promise<{ previewUrl?: string; success?: boolean; error?: string; messageId?: string; accepted?: string[]; rejected?: string[]; response?: string }> {
     const res = await fetch(`/api/invoices/${id}/send`, {
       method: "POST",
+      headers: { Accept: "application/json" },
       credentials: "include",
     })
     if (!res.ok) {
-      const data = await res.json()
-      throw new Error(data.error || "Failed to send invoice email")
+      const contentType = res.headers.get('content-type') || ''
+      let message = `Failed to send invoice email (HTTP ${res.status})`
+      try {
+        if (contentType.includes('application/json')) {
+          const data = await res.json()
+          message = data?.error || message
+        } else {
+          const text = await res.text()
+          // Include a short snippet of any HTML/text response
+          const snippet = text.slice(0, 200)
+          message = `${message}: ${snippet}`
+        }
+      } catch {
+        // ignore parse errors and keep default message
+      }
+      throw new Error(message)
     }
-    return res.json()
+    try {
+      return await res.json()
+    } catch {
+      // In case server returns empty body
+      return { success: true }
+    }
   }
 
   // Optionally, implement markAsPaid with API endpoints if needed

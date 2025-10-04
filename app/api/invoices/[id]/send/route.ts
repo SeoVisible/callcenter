@@ -4,9 +4,19 @@ import { PrismaClient } from "@prisma/client"
 import nodemailer from "nodemailer"
 import { formatCurrency, DEFAULT_CURRENCY } from '../../../../../lib/currency'
 
+// Minimal shape of Nodemailer response we care about (avoid any)
+interface MailDeliveryInfo {
+  messageId: string
+  accepted: string[]
+  rejected?: string[]
+  response?: string
+  envelope?: { from?: string; to?: string | string[] }
+}
+
 const prisma = new PrismaClient()
 
-export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+// Await dynamic route params per Next.js guidance
+export async function POST(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params
   try {
     // Fetch invoice and client info
@@ -18,32 +28,29 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
       return NextResponse.json({ error: "Invoice or client email not found" }, { status: 404 })
     }
 
-    // Create SMTP transport with fallback to working test service
-    let transporter;
-    
-    if (process.env.SMTP_USER && process.env.SMTP_PASS && !process.env.SMTP_USER.includes('your-gmail')) {
-      // Use configured SMTP if credentials are set
-      transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: Number(process.env.SMTP_PORT),
-        secure: process.env.SMTP_SECURE === 'true',
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
-        },
-      });
-    } else {
-      // Fallback to Ethereal test service (always works)
-      const testAccount = await nodemailer.createTestAccount();
-      transporter = nodemailer.createTransport({
-        host: 'smtp.ethereal.email',
-        port: 587,
-        secure: false,
-        auth: {
-          user: testAccount.user,
-          pass: testAccount.pass,
-        },
-      });
+    // Strict SMTP transport: use configured SMTP only; no fallback to Ethereal
+    const { SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS, SMTP_FROM, SMTP_FROM_NAME } = process.env as Record<string, string | undefined>
+    if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
+      return NextResponse.json({ error: 'SMTP is not configured. Please set SMTP_HOST, SMTP_USER, and SMTP_PASS in .env' }, { status: 500 })
+    }
+
+    const port = Number(SMTP_PORT || (SMTP_SECURE === 'true' ? 465 : 587))
+    const secure = SMTP_SECURE === 'true' || port === 465
+
+    const transporter = nodemailer.createTransport({
+      host: SMTP_HOST,
+      port,
+      secure,
+      auth: {
+        user: SMTP_USER,
+        pass: SMTP_PASS,
+      },
+    })
+    try {
+      await transporter.verify()
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      return NextResponse.json({ error: `SMTP verify failed: ${msg}` }, { status: 500 })
     }
 
     // Compute total
@@ -97,12 +104,30 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
       </div>
     `
 
-    const info = await transporter.sendMail({
-      from: `"${process.env.SMTP_FROM_NAME || 'Pro Arbeitsschutz'}" <${process.env.SMTP_FROM || 'info@pro-arbeitsschutz.com'}>`,
+    const debugCopy = process.env.EMAIL_DEBUG_COPY === 'true' ? (SMTP_FROM || SMTP_USER) : undefined
+    const rawInfo = await transporter.sendMail({
+      from: `"${SMTP_FROM_NAME || 'Pro Arbeitsschutz'}" <${SMTP_FROM || SMTP_USER}>`,
       to: invoice.client.email,
-      subject: `Invoice to be paid`,
+      bcc: debugCopy,
+      envelope: {
+        from: SMTP_USER || SMTP_FROM, // sets Return-Path to the authenticated mailbox
+        to: invoice.client.email,
+      },
+      replyTo: SMTP_FROM || SMTP_USER,
+      subject: `Rechnung ${invoiceNumber} - Pro Arbeitsschutz`,
+      text: `Sehr geehrte/r ${invoice.client.name},\n\nBitte finden Sie unten die Details zu Ihrer Rechnung ${invoiceNumber}. Gesamtbetrag: ${formatCurrency(total, DEFAULT_CURRENCY)}.\n\nMit freundlichen Grüßen\nPro Arbeitsschutz`,
       html,
     })
+    const info = rawInfo as unknown as MailDeliveryInfo
+    try {
+      console.log('[mail] sent', {
+        messageId: info.messageId,
+        accepted: info.accepted,
+        rejected: info.rejected,
+        response: info.response,
+        envelope: info.envelope,
+      })
+    } catch {}
 
     // Update invoice status to 'sent'
     await prisma.invoice.update({
@@ -110,9 +135,17 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
       data: { status: 'sent' },
     })
 
-    // Preview URL for dev
-    return NextResponse.json({ success: true, previewUrl: nodemailer.getTestMessageUrl(info) })
+    // Return delivery info (no preview in real SMTP)
+    return NextResponse.json({
+      success: true,
+      messageId: info.messageId,
+      accepted: info.accepted,
+      rejected: info.rejected,
+      response: info.response,
+    })
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: 500 })
+    // Provide clearer error message to the client UI
+    const msg = error instanceof Error ? error.message : String(error)
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 }

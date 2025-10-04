@@ -153,51 +153,42 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
   // PDF header email updated to pro domain (PDF-only)
   doc.text('info@pro-arbeitsschutz.com', rightX, yBase + 54)
 
-  // RECHNUNG title at the top left - positioned to match reference image
-  doc.setFontSize(20)
-  doc.setTextColor(0, 0, 0) // Black text
-  doc.text('RECHNUNG', leftX, yBase + 110)
-
-  // LEFT SIDE: Client address section
-  const clientY = yBase + 150
-  
-  doc.setFontSize(10)
-  doc.setTextColor(0, 0, 0) // Black text
-  doc.text('Rechnungsadresse:', leftX, clientY)
+  // LEFT SIDE: Client address section (without heading)
+  const clientY = yBase + 110
   
   doc.setFontSize(11)
-  doc.text(invoice.clientName || '', leftX, clientY + 18)
-  if (invoice.clientCompany) doc.text(invoice.clientCompany, leftX, clientY + 32)
+  doc.setTextColor(0, 0, 0) // Black text
+  doc.text(invoice.clientName || '', leftX, clientY)
+  if (invoice.clientCompany) doc.text(invoice.clientCompany, leftX, clientY + 14)
   
   // Add client address with proper spacing
   const client = (invoice as any).client
-  if (client?.address?.street) doc.text(client.address.street, leftX, clientY + 46)
+  if (client?.address?.street) doc.text(client.address.street, leftX, clientY + 28)
   if (client?.address?.zipCode || client?.address?.city) {
     const cityLine = [client.address.zipCode, client.address.city].filter(Boolean).join(' ')
-    if (cityLine) doc.text(cityLine, leftX, clientY + 60)
+    if (cityLine) doc.text(cityLine, leftX, clientY + 42)
   }
   if (client?.address?.country && client.address.country !== 'Germany' && client.address.country !== 'Deutschland') {
-    doc.text(client.address.country, leftX, clientY + 74)
+    doc.text(client.address.country, leftX, clientY + 56)
   }
 
-  // RIGHT SIDE: Invoice information - moved slightly to the left
+  // RIGHT SIDE: Only Auftragsdatum and Rechnungsdatum
   const invoiceInfoX = 420
   doc.setFontSize(10)
   doc.setTextColor(0, 0, 0) // Black text
   
-  if ((invoice as any).invoiceNumber) {
-    doc.text(`Rechnungsnummer: ${(invoice as any).invoiceNumber}`, invoiceInfoX, clientY)
-  }
-
   // Continue with invoice dates on the right side
   const safeDate = (d: any) => formatDateSafe(d, 'de-DE')
   const invoiceDate = safeDate(invoice.issueDate ?? invoice.createdAt)
   const serviceDate = safeDate(invoice.createdAt)
-  const dueDate = safeDate(invoice.dueDate)
+
+  // Add back invoice number
+  const invNo = (invoice as any).invoiceNumber
+  if (invNo) doc.text(`Rechnungsnummer: ${invNo}`, invoiceInfoX, clientY)
   
-  if (invoiceDate) doc.text(`Rechnungsdatum: ${invoiceDate}`, invoiceInfoX, clientY + 14)
-  if (serviceDate) doc.text(`Leistungsdatum: ${serviceDate}`, invoiceInfoX, clientY + 28)
-  if (dueDate) doc.text(`Fälligkeitsdatum: ${dueDate}`, invoiceInfoX, clientY + 42)
+  const line1Y = invNo ? clientY + 14 : clientY
+  if (serviceDate) doc.text(`Auftragsdatum: ${serviceDate}`, invoiceInfoX, line1Y)
+  if (invoiceDate) doc.text(`Rechnungsdatum: ${invoiceDate}`, invoiceInfoX, line1Y + 14)
 
   // Items table - headers matching the image exactly
     const head = showPrices ? ['Pos.', 'Menge', 'Artikel-Bezeichnung', 'Einzelpreis', 'Gesamtpreis'] : ['Pos.', 'Menge', 'Artikel-Bezeichnung']
@@ -277,7 +268,7 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
     }
 
     autoTable(doc, {
-      startY: clientY + 100, // Start after client and invoice info sections
+      startY: clientY + 80, // Start after client and invoice info sections
       head: [head],
       body,
       headStyles: { 
