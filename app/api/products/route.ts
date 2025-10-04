@@ -133,7 +133,7 @@ export async function PUT(req: Request) {
     const e = err as { message?: string }
     const msg = typeof e?.message === 'string' ? e.message : ''
     if (msg.includes('Unknown argument `buyingPrice`') || msg.includes("Unknown argument 'buyingPrice'")) {
-      const { buyingPrice, ...safeUpdate } = updateData as Record<string, unknown>
+      const { buyingPrice: _, ...safeUpdate } = updateData as Record<string, unknown>
       const product = await prisma.product.update({ where: { id }, data: safeUpdate as unknown as Record<string, unknown> })
       return NextResponse.json(product)
     }

@@ -20,7 +20,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Plus, Edit, Trash2, Loader2, Globe, User, BarChart } from "lucide-react"
-import Link from 'next/link'
+
 import { formatCurrency, DEFAULT_CURRENCY } from '@/lib/currency'
 import { toast } from "sonner"
 

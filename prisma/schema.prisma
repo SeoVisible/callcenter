@@ -1,84 +1,84 @@
 generator client {
-  provider = "prisma-client-js"
+    provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
 }
 
 model User {
-  id       String    @id @default(uuid())
-  name     String
-  email    String    @unique
-  password String
-  role     String
-  invoices Invoice[] @relation("UserInvoices")
-  products Product[] @relation("UserProducts")
+    id       String    @id @default(uuid())
+    name     String
+    email    String    @unique
+    password String
+    role     String
+    invoices Invoice[] @relation("UserInvoices")
+    products Product[] @relation("UserProducts")
 }
 
 model Product {
-  id           String        @id @default(uuid())
-  name         String
-  description  String
-  price        Float
-  category     String
-  sku          String
-  createdBy    String
-  isGlobal     Boolean
-  stock        Int           @default(0)
-  buyingPrice  Float         @default(0)
-  invoiceItems InvoiceItem[]
-  user         User          @relation("UserProducts", fields: [createdBy], references: [id])
+    id           String        @id @default(uuid())
+    name         String
+    description  String
+    price        Float
+    category     String
+    sku          String
+    createdBy    String
+    isGlobal     Boolean
+    stock        Int           @default(0)
+    buyingPrice  Float         @default(0)
+    invoiceItems InvoiceItem[]
+    user         User          @relation("UserProducts", fields: [createdBy], references: [id])
 }
 
 model Client {
-  id        String    @id @default(uuid())
-  name      String
-  email     String    @unique
-  company   String?
-  address   Json
-  createdBy String
-  notes     String?
-  phone     String
-  createdAt DateTime  @default(now())
-  invoices  Invoice[]
+    id        String    @id @default(uuid())
+    name      String
+    email     String    @unique
+    company   String?
+    address   Json
+    createdBy String
+    notes     String?
+    phone     String
+    createdAt DateTime  @default(now())
+    invoices  Invoice[]
 }
 
 model Invoice {
-  id            String        @id @default(uuid())
-  clientId      String
-  createdBy     String
-  dueDate       DateTime
-  taxRate       Float
-  notes         String?
-  status        InvoiceStatus @default(pending)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  invoiceNumber String?       @unique
-  client        Client        @relation(fields: [clientId], references: [id])
-  user          User          @relation("UserInvoices", fields: [createdBy], references: [id])
-  lineItems     InvoiceItem[]
+    id            String        @id @default(uuid())
+    clientId      String
+    createdBy     String
+    dueDate       DateTime
+    taxRate       Float
+    notes         String?
+    status        InvoiceStatus @default(pending)
+    createdAt     DateTime      @default(now())
+    updatedAt     DateTime      @updatedAt
+    invoiceNumber String?       @unique
+    client        Client        @relation(fields: [clientId], references: [id])
+    user          User          @relation("UserInvoices", fields: [createdBy], references: [id])
+    lineItems     InvoiceItem[]
 }
 
 model InvoiceItem {
-  id          String   @id @default(uuid())
-  invoiceId   String
-  productId   String?
-  productName String
-  description String?
-  quantity    Int
-  unitPrice   Float
-  buyingPrice Float?
-  invoice     Invoice  @relation(fields: [invoiceId], references: [id])
-  product     Product? @relation(fields: [productId], references: [id], onUpdate: NoAction)
+    id          String   @id @default(uuid())
+    invoiceId   String
+    productId   String?
+    productName String
+    description String?
+    quantity    Int
+    unitPrice   Float
+    buyingPrice Float?
+    invoice     Invoice  @relation(fields: [invoiceId], references: [id])
+    product     Product? @relation(fields: [productId], references: [id], onUpdate: NoAction)
 }
 
 enum InvoiceStatus {
-  pending
-  maker
-  sent
-  paid
-  not_paid
-  completed
+    pending
+    maker
+    sent
+    paid
+    not_paid
+    completed
 }

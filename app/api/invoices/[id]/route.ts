@@ -34,7 +34,7 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
 
   // Server-side validation: if lineItems provided, ensure unitPrice >= product.price for each submitted item
   if (data.lineItems) {
-  const productIds = Array.from(new Set((data.lineItems as Array<Record<string, unknown>>).map((li) => String((li as Record<string, unknown>).productId)).filter(Boolean))) as string[];
+  const productIds = Array.from(new Set((data.lineItems as Array<Record<string, unknown>>).map((li) => String((li as Record<string, unknown>).productId)).filter(Boolean).filter((id) => id !== "virtual-shipping"))) as string[];
     if (productIds.length > 0) {
       const products = await prisma.product.findMany({ where: { id: { in: productIds } }, select: { id: true, price: true } });
       const priceById: Record<string, number> = {};
@@ -70,8 +70,27 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
   // Re-create line items if provided
   let updatedInvoice = invoice
   if (data.lineItems) {
-    const lineItems = data.lineItems.map((item: { productId: string, productName: string, description: string, quantity: number, unitPrice: number }) => ({
-      productId: item.productId,
+    // Verify all products exist before creating line items (exclude virtual products)
+    const productIds = data.lineItems.map((item: { productId?: string | null }) => item.productId).filter((id: string | null | undefined): id is string => Boolean(id) && id !== "virtual-shipping")
+    if (productIds.length > 0) {
+      const existingProducts = await prisma.product.findMany({ 
+        where: { id: { in: productIds } },
+        select: { id: true }
+      })
+      const existingProductIds = new Set(existingProducts.map(p => p.id))
+      
+      // Check for missing products
+      const missingProductIds = productIds.filter((id: string) => !existingProductIds.has(id))
+      if (missingProductIds.length > 0) {
+        return NextResponse.json(
+          { error: `Products not found: ${missingProductIds.join(', ')}` },
+          { status: 400 }
+        )
+      }
+    }
+
+    const lineItems = data.lineItems.map((item: { productId: string | null, productName: string, description: string, quantity: number, unitPrice: number }) => ({
+      productId: (item.productId === "virtual-shipping" || !item.productId) ? null : item.productId,
       productName: item.productName,
       description: item.description,
       quantity: item.quantity,

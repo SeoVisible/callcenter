@@ -14,7 +14,7 @@ import { InvoiceList } from "@/components/invoice-list"
 import { InvoiceForm } from "@/components/invoice-form"
 import { InvoiceView } from "@/components/invoice-view"
 import { invoiceService } from "@/lib/invoices"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+
 import { DashboardHome } from "@/components/dashboard-home"
 import dynamic from 'next/dynamic'
 import { useAuth } from "@/contexts/auth-context"

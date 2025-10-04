@@ -44,8 +44,21 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
   const { user } = useAuth()
   const [clients, setClients] = useState<Client[]>([])
   const [products, setProducts] = useState<Product[]>([])
+  
+  // Helper function to sort line items so shipping appears at the bottom
+  const sortLineItems = (items: LineItemForm[]) => {
+    return [...items].sort((a, b) => {
+      const aIsShipping = a.productId === "virtual-shipping" || a.productName.toLowerCase().includes('versand') || a.productName.toLowerCase().includes('shipping')
+      const bIsShipping = b.productId === "virtual-shipping" || b.productName.toLowerCase().includes('versand') || b.productName.toLowerCase().includes('shipping')
+      
+      if (aIsShipping && !bIsShipping) return 1
+      if (!aIsShipping && bIsShipping) return -1
+      return 0
+    })
+  }
+  
   // Shipping will be added as a product line item. If no shipping product exists
-  // in the catalog we will insert a virtual 'Shipping' line item so it's always available.
+  // in the catalog we will insert a virtual 'Versand' line item so it's always available.
   const [formData, setFormData] = useState({
     clientId: clientId || "",
     dueDate: "",
@@ -74,13 +87,13 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
         status: invoice.status || "pending",
       })
       setLineItems(
-        invoice.lineItems.map((item) => ({
+        sortLineItems(invoice.lineItems.map((item) => ({
           productId: item.productId,
           productName: item.productName,
           description: item.description,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
-        })),
+        }))),
       )
     } else if (clientId) {
       setFormData((prev) => ({ ...prev, clientId }))
@@ -130,37 +143,30 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
     }
   }
 
-  // shipping products are regular products that either have category 'shipping' or include 'shipping' in the name
-  const shippingProducts = products.filter((p) => (p.category || "").toLowerCase() === "shipping" || p.name.toLowerCase().includes("shipping"))
+
 
   const addShipping = () => {
+    // Create shipping item
+    const shippingItem = {
+      productId: "virtual-shipping",
+      productName: "Versand",
+      description: "Versand",
+      quantity: 1,
+      unitPrice: 0,
+    }
+
     // Prefer an explicit shipping product if present
     const product = products.find((p) => (p.category || "").toLowerCase() === "shipping" || p.name.toLowerCase().includes("shipping"))
     if (product) {
-      setLineItems([
-        ...lineItems,
-        {
-          productId: product.id,
-          productName: product.name,
-          description: product.description || "Shipping",
-          quantity: 1,
-          unitPrice: product.price,
-        },
-      ])
-      return
+      shippingItem.productId = product.id
+      shippingItem.unitPrice = product.price
     }
 
-    // No shipping product in catalog: insert a virtual shipping line item so user can always add shipping
-    setLineItems([
+    // Add shipping and sort so it appears at the bottom
+    setLineItems(sortLineItems([
       ...lineItems,
-      {
-        productId: "virtual-shipping",
-        productName: "Shipping",
-        description: "Shipping",
-        quantity: 1,
-        unitPrice: 0,
-      },
-    ])
+      shippingItem,
+    ]))
   }
 
   const addLineItem = () => {
@@ -189,10 +195,10 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
     if (field === "productId" && typeof value === "string") {
       const product = products.find((p) => p.id === value)
       if (product) {
-        // For shipping-type products, normalize the productName to 'Shipping'
+        // For shipping-type products, normalize the productName to 'Versand'
         const isShipping = ((product.category || "").toLowerCase() === "shipping") || product.name.toLowerCase().includes("shipping")
-        updated[index].productName = isShipping ? "Shipping" : product.name
-        updated[index].description = product.description
+        updated[index].productName = isShipping ? "Versand" : product.name
+        updated[index].description = isShipping ? "Versand" : product.description
         updated[index].unitPrice = product.price
       }
     }
@@ -207,7 +213,7 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
       }
     }
 
-    setLineItems(updated)
+    setLineItems(sortLineItems(updated))
   }
 
   const calculateSubtotal = () => {
@@ -252,11 +258,7 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
         return
       }
 
-      const clientData = {
-        name: selectedClient.name,
-        email: selectedClient.email,
-        company: selectedClient.company,
-      }
+
 
       if (invoice) {
         // Validate unit prices are not below the product's listed price
@@ -442,7 +444,7 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
                           const isShipping = item.productId === "virtual-shipping" || (!!p && (((p.category || "").toLowerCase() === "shipping") || p.name.toLowerCase().includes("shipping")))
                           if (isShipping) {
                             return (
-                              <div className="font-medium">Shipping</div>
+                              <div className="font-medium">Versand</div>
                             )
                           }
 

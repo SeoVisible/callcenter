@@ -50,7 +50,6 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
   const [query, setQuery] = useState("")
   const [debouncedQuery, setDebouncedQuery] = useState("")
   const [loading, setLoading] = useState(true)
-  const [tableLoading, setTableLoading] = useState(false)
   const [filterStatus, setFilterStatus] = useState<InvoiceStatus | "">("")
   const [filterClient, setFilterClient] = useState<string | "">("")
   const [filterUser, setFilterUser] = useState<string | "">("")
@@ -60,12 +59,11 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
   const [deleting, setDeleting] = useState(false)
   const [sendingId, setSendingId] = useState<string | null>(null)
   const [markingPaidId, setMarkingPaidId] = useState<string | null>(null)
-  const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null)
 
   const loadInvoices = async (opts?: { status?: string, sortBy?: string, sortDir?: string, clientId?: string, filterUserId?: string }) => {
     try {
-      // If this is the initial load (loading flag), keep that behavior. Otherwise show tableLoading.
-      if (!loading) setTableLoading(true)
+      // If this is the initial load (loading flag), keep that behavior.
+      if (!loading) setLoading(true)
       // prefer explicit opts -> component state -> initialFilterUserId
       const statusParam = opts?.status ?? (filterStatus ? String(filterStatus) : undefined)
       const clientParam = opts?.clientId ?? (filterClient ? String(filterClient) : undefined)
@@ -78,7 +76,6 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
   toast.error("Fehler beim Laden der Rechnungen")
     } finally {
       setLoading(false)
-      setTableLoading(false)
     }
   }
 
@@ -123,7 +120,6 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
   }, [filterClient, filterUser])
 
   const applyFilters = async () => {
-    setTableLoading(true)
     try {
       const statusParam = filterStatus ? String(filterStatus) : undefined
   const clientParam = filterClient ? String(filterClient) : undefined
@@ -134,7 +130,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
     } catch {
       toast.error('Filter konnten nicht angewendet werden')
     } finally {
-      setTableLoading(false)
+      // Filter operation complete
     }
   }
 
@@ -319,26 +315,23 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
     }
 
   // Header: render logo on the left, company info on the right
-  const leftX = 20
+  const leftX = 40
   const rightX = 420
   const yBase = 40
 
-  // Default info start (when no logo is present)
-  let infoStartY = yBase
-
-    if (logoDataUrl) {
+  if (logoDataUrl) {
       try {
-        const maxW = 140
-        const maxH = 50
+        const maxW = 300
+        const maxH = 120
         const naturalW = logoNaturalW || maxW
         const naturalH = logoNaturalH || maxH
         const scale = Math.min(maxW / naturalW, maxH / naturalH, 1)
         const imgW = Math.round(naturalW * scale)
         const imgH = Math.round(naturalH * scale)
-        const imgY = yBase - 10
+        // Position logo at the very top left
+        const imgY = 20
         doc.addImage(logoDataUrl, 'PNG', leftX, imgY, imgW, imgH)
-        infoStartY = yBase + imgH - 8
-      } catch (e) {
+      } catch {
         doc.setFontSize(18)
         doc.text('pro-arbeitsschutz.de', leftX, yBase + 12)
       }
@@ -347,75 +340,99 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
       doc.text('pro-arbeitsschutz.de', leftX, yBase + 12)
     }
 
+  // Top right company details - company name larger and positioned higher
+  doc.setFontSize(14)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(0, 0, 0)
+  doc.text('Pro Arbeitsschutz', rightX, yBase)
+  
+  // Rest of company info in normal size
   doc.setFontSize(10)
-  // render company/contact info starting at computed Y so it won't collide with the logo
-  // Use Pro Arbeitsschutz address (PDF-only)
-  doc.text('Pro Arbeitsschutz', rightX, infoStartY)
-  doc.text('Dieselstraße 6–8', rightX, infoStartY + 12)
-  doc.text('63165 Mühlheim am Main', rightX, infoStartY + 24)
-  doc.text('Tel: +4961089944981', rightX, infoStartY + 36)
-  // PDF header email updated to pro domain (PDF-only)
-  doc.text('info@pro-arbeitsschutz.de', rightX, infoStartY + 48)
+  doc.setFont('helvetica', 'normal')
+  doc.text('Tel: +4961089944981', rightX, yBase + 18)
+  doc.text('info@pro-arbeitsschutz.com', rightX, yBase + 33)
 
-    // Title
-    doc.setFontSize(20)
-    doc.setTextColor(40, 40, 80)
-    doc.text('Rechnung', leftX, yBase + 80)
+  // RECHNUNG title at the top left - positioned to match reference image
+  doc.setFontSize(20)
+  doc.setTextColor(0, 0, 0) // Black text
+  doc.text('RECHNUNG', leftX, yBase + 110)
+
+  // LEFT SIDE: Client address section
+  const clientY = yBase + 150
+  
+  doc.setFontSize(10)
+  doc.setTextColor(0, 0, 0) // Black text
+  doc.text('Rechnungsadresse:', leftX, clientY)
+  
+  doc.setFontSize(11)
+  doc.text(invoice.clientName || '', leftX, clientY + 18)
+  if (invoice.clientCompany) doc.text(invoice.clientCompany, leftX, clientY + 32)
+  
+  // Add client address with proper spacing
+  const client = (invoice as any).client
+  if (client?.address?.street) doc.text(client.address.street, leftX, clientY + 46)
+  if (client?.address?.zipCode || client?.address?.city) {
+    const cityLine = [client.address.zipCode, client.address.city].filter(Boolean).join(' ')
+    if (cityLine) doc.text(cityLine, leftX, clientY + 60)
+  }
+  if (client?.address?.country && client.address.country !== 'Germany' && client.address.country !== 'Deutschland') {
+    doc.text(client.address.country, leftX, clientY + 74)
+  }
+
+  // RIGHT SIDE: Invoice information - moved slightly to the left
+  const invoiceInfoX = 420
+  doc.setFontSize(10)
+  doc.setTextColor(0, 0, 0) // Black text
+  
+  if ((invoice as any).invoiceNumber) {
+    doc.text(`Rechnungsnummer: ${(invoice as any).invoiceNumber}`, invoiceInfoX, clientY)
+  }
+
+  // Continue with invoice dates on the right side
+  const safeDate = (d: unknown) => {
+    try {
+      const dt = new Date(String(d))
+      if (isNaN(dt.getTime())) return ''
+      return dt.toLocaleDateString('de-DE')
+    } catch { return '' }
+  }
+  const invoiceDate = safeDate(invoice.issueDate ?? invoice.createdAt)
+  const serviceDate = safeDate(invoice.createdAt)
+  const dueDate = safeDate(invoice.dueDate)
+  
+  if (invoiceDate) doc.text(`Rechnungsdatum: ${invoiceDate}`, invoiceInfoX, clientY + 14)
+  if (serviceDate) doc.text(`Leistungsdatum: ${serviceDate}`, invoiceInfoX, clientY + 28)
+  if (dueDate) doc.text(`Fälligkeitsdatum: ${dueDate}`, invoiceInfoX, clientY + 42)
+
+    // Items table - headers matching the invoice view exactly
+    const head = showPrices ? ['Pos.', 'Menge', 'Artikel-Bezeichnung', 'Einzelpreis', 'Gesamtpreis'] : ['Pos.', 'Menge', 'Artikel-Bezeichnung']
     
-    // Invoice number
-    if ((invoice as any).invoiceNumber) {
-      doc.setFontSize(16)
-      doc.setTextColor(60, 60, 60)
-      doc.text(`#${(invoice as any).invoiceNumber}`, leftX, yBase + 100)
-    }
-
-    // Client (left) and Invoice meta (right)
-    const clientY = yBase + 120
-    doc.setFontSize(11)
-    doc.setTextColor(0)
-    doc.text('Rechnung an:', leftX, clientY)
-    doc.setFontSize(10)
-    doc.text(invoice.clientName || '', leftX, clientY + 14)
-    if (invoice.clientCompany) doc.text(invoice.clientCompany, leftX, clientY + 28)
-    // Add client address
-    const client = (invoice as any).client
-    if (client?.address?.street) doc.text(client.address.street, leftX, clientY + 42)
-    if (client?.address?.zipCode || client?.address?.city) {
-      const cityLine = [client.address.zipCode, client.address.city].filter(Boolean).join(' ')
-      if (cityLine) doc.text(cityLine, leftX, clientY + 56)
-    }
-    if (client?.address?.country && client.address.country !== 'Germany' && client.address.country !== 'Deutschland') {
-      doc.text(client.address.country, leftX, clientY + 70)
-    }
-
-    const metaX = 360
-    doc.setFontSize(10)
-    const safeDate = (d: unknown) => {
-      try {
-        const dt = new Date(String(d))
-        if (isNaN(dt.getTime())) return ''
-        return dt.toLocaleDateString('de-DE')
-      } catch { return '' }
-    }
-    const invoiceDate = safeDate(invoice.issueDate ?? invoice.createdAt)
-    const serviceDate = safeDate(invoice.createdAt)
-    const dueDate = safeDate(invoice.dueDate)
-    if (invoiceDate) doc.text(`Rechnungsdatum: ${invoiceDate}`, metaX, clientY)
-    if (serviceDate) doc.text(`Leistungsdatum: ${serviceDate}`, metaX, clientY + 14)
-    if (dueDate) doc.text(`Fälligkeitsdatum: ${dueDate}`, metaX, clientY + 28)
-
-    // Items table
-    const head = showPrices ? ['Menge', 'Art.Nr.', 'Bezeichnung', 'Einzelpreis', 'Gesamt'] : ['Menge', 'Art.Nr.', 'Bezeichnung']
-    type LineWithSku = Invoice['lineItems'][number] & { sku?: string }
-    const body = invoice.lineItems.map((item) => {
-      const sku = (item as LineWithSku).sku || ''
+    // Sort items so shipping appears last
+    const sortedItems = [...invoice.lineItems].sort((a, b) => {
+      const aIsShipping = a.productName.toLowerCase().includes('shipping') || a.productName.toLowerCase().includes('versand')
+      const bIsShipping = b.productName.toLowerCase().includes('shipping') || b.productName.toLowerCase().includes('versand')
+      
+      if (aIsShipping && !bIsShipping) return 1
+      if (!aIsShipping && bIsShipping) return -1
+      return 0
+    })
+    
+    const body = sortedItems.map((item, index) => {
+      const position = (index + 1).toString() // Position number starting from 1
       const qty = Number(item.quantity ?? 0)
       const unit = Number(item.unitPrice ?? 0)
       const lineTotal = qty * unit
-      if (showPrices) {
-        return [String(qty), sku, item.productName + (item.description ? `\n${item.description}` : ''), formatCurrency(unit, DEFAULT_CURRENCY), formatCurrency(lineTotal, DEFAULT_CURRENCY)]
+      
+      // Replace "Shipping" with "Versand" in product name
+      let productName = item.productName
+      if (productName.toLowerCase().includes('shipping')) {
+        productName = productName.replace(/shipping/gi, 'Versand')
       }
-      return [String(qty), sku, item.productName + (item.description ? `\n${item.description}` : '')]
+      
+      if (showPrices) {
+        return [position, String(qty), productName + (item.description ? ` - ${item.description}` : ''), `€ ${unit.toFixed(2)}`, `€ ${lineTotal.toFixed(2)}`]
+      }
+      return [position, String(qty), productName + (item.description ? ` - ${item.description}` : '')]
     })
 
     interface DocWithAutoTable {
@@ -435,31 +452,31 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
     const pageW = typeof internalForTable.pageSize.getWidth === 'function'
       ? internalForTable.pageSize.getWidth()
       : (internalForTable.pageSize.width ?? 595)
-    const rightMarginForTable = 60
+    const rightMarginForTable = 45
     const availableWidth = Math.max(pageW - leftX - rightMarginForTable, 300)
 
   let columnStyles: Record<string, unknown>
     if (showPrices) {
-      const w0 = 50
-      const w1 = 60
-      const w3 = 80
-      const w4 = 80
-      const descW = Math.max(availableWidth - (w0 + w1 + w3 + w4), 120)
+      const w0 = 35 // position
+      const w1 = 40 // qty
+      const w3 = 70 // unit price
+      const w4 = 80 // total
+      const descW = Math.max(availableWidth - (w0 + w1 + w3 + w4), 150)
       columnStyles = {
-        '0': { cellWidth: w0, halign: 'right' },
-        '1': { cellWidth: w1, halign: 'left' },
-        '2': { cellWidth: descW },
-        '3': { cellWidth: w3, halign: 'right' },
-        '4': { cellWidth: w4, halign: 'right' }
+        '0': { cellWidth: w0, halign: 'center' }, // Position centered
+        '1': { cellWidth: w1, halign: 'center' }, // Quantity centered
+        '2': { cellWidth: descW, halign: 'left' }, // Description left
+        '3': { cellWidth: w3, halign: 'right' }, // Unit price right
+        '4': { cellWidth: w4, halign: 'right' }  // Total right
       }
     } else {
-      const w0 = 60
-      const w1 = 80
-      const descW = Math.max(availableWidth - (w0 + w1), 180)
+      const w0 = 35 // position
+      const w1 = 40 // qty
+      const descW = Math.max(availableWidth - (w0 + w1), 150)
       columnStyles = {
-        '0': { cellWidth: w0, halign: 'right' },
-        '1': { cellWidth: w1, halign: 'left' },
-        '2': { cellWidth: descW }
+        '0': { cellWidth: w0, halign: 'center' }, // Position centered
+        '1': { cellWidth: w1, halign: 'center' }, // Quantity centered
+        '2': { cellWidth: descW, halign: 'left' } // Description left
       }
     }
 
@@ -467,21 +484,38 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore
   autoTable(doc, {
-      startY: clientY + 80,
+      startY: clientY + 100, // Start after client and invoice info sections
       head: [head],
       body,
-      headStyles: { fillColor: [245, 245, 245], textColor: 40, fontStyle: 'bold' },
-      styles: { cellPadding: 6, overflow: 'linebreak' },
+      headStyles: { 
+        fillColor: [240, 240, 240], // Light gray header like professional invoices
+        textColor: [0, 0, 0], // Black text
+        fontStyle: 'bold',
+        fontSize: 9
+      },
+      styles: { 
+        cellPadding: 4, 
+        overflow: 'linebreak',
+        fontSize: 9,
+        lineColor: [200, 200, 200],
+        lineWidth: 0.3
+      },
       // autoTable expects a string-indexed map for columnStyles
-  columnStyles: columnStyles as any,
-      bodyStyles: { fontSize: 10, valign: 'middle' }
+      columnStyles: columnStyles as any,
+      bodyStyles: { 
+        fontSize: 9, 
+        valign: 'middle'
+      },
+      alternateRowStyles: {
+        fillColor: [250, 250, 250] // Very light gray for alternating rows
+      }
     })
 
     const finalY = ((doc as unknown as DocWithAutoTable).lastAutoTable?.finalY) || (clientY + 180)
 
     // Totals box on the right
     if (showPrices) {
-      const totalsX = 360
+      const totalsX = 365
       let line1Y = finalY + 28
       const lineGap = 16
       const internal = (doc as unknown as DocWithAutoTable).internal
@@ -503,16 +537,16 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
       const pageWidth = typeof internal.pageSize.getWidth === 'function'
         ? internal.pageSize.getWidth!()
         : (internal.pageSize.width ?? 0)
-      const valueX = pageWidth - 60
+      const valueX = pageWidth - 50
 
-      doc.setFontSize(10)
-      doc.setTextColor(40)
+      // Professional totals section - clean and readable
+      doc.setFontSize(11)
+      doc.setTextColor(0, 0, 0) // Black text for better readability
       doc.setFont('helvetica', 'normal')
       doc.text('Gesamt Netto:', totalsX, line1Y)
       doc.text(formatCurrency(computedSubtotal, DEFAULT_CURRENCY), valueX, line1Y, { align: 'right' })
 
-      const taxRateStr = `${String(taxRateNum).replace('.', ',')}` + '\u00A0%'
-      doc.text(`Umsatzsteuer (${taxRateStr}):`, totalsX, line1Y + lineGap)
+      doc.text(`Umsatzsteuer (${taxRateNum}%):`, totalsX, line1Y + lineGap)
       doc.text(formatCurrency(computedTax, DEFAULT_CURRENCY), valueX, line1Y + lineGap, { align: 'right' })
 
       doc.setFontSize(12)
@@ -523,70 +557,34 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
       doc.setFont('helvetica', 'normal')
     }
 
-    // Footer
-      // Footer (PDF-only bank/contact info) — wrap and place safely above bottom
-      doc.setFontSize(9)
-      doc.setTextColor(100)
-      const formatIban = (iban?: string) => {
-        if (!iban) return ''
-        return String(iban).replace(/\s+/g, '').replace(/(.{4})/g, '$1 ').trim()
-      }
-      const bankIbanRaw = 'DE90506521240008142622' // from provided image: DE90 5065 2124 0008 1426 22
-      const bankBic = 'HELADEF1SLS' // visible on provided attachment
-      const serviceHotline = '+49 89 411 3' // partial as visible on image; kept in PDF footer
-      const companyLine = 'Pro Arbeitsschutz — Dieselstraße 6–8, 63165 Mühlheim am Main'
-      const ibanLine = `IBAN: ${formatIban(bankIbanRaw)}  |  BIC: ${bankBic}`
-      const contactLine = `Tel: +4961089944981  — E-Mail: info@pro-arbeitsschutz.de`
-  const website = 'www.pro-arbeitsschutz.de'
-
-      const internal = (doc as unknown as DocWithAutoTable).internal
-      const pageWidth = typeof internal.pageSize.getWidth === 'function'
-        ? internal.pageSize.getWidth!()
-        : (internal.pageSize.width ?? 0)
-      const pageHeight = typeof internal.pageSize.getHeight === 'function'
-        ? internal.pageSize.getHeight!()
-        : (internal.pageSize.height ?? 0)
-
-      const rightMargin = 40
-      const maxWidth = pageWidth - leftX - rightMargin
-
-      // PDF-only signature block (show only the full signature/address once)
-      const signatureLines = [
-        'Mit freundlichen Grüßen',
-        '',
-        'Pro Arbeitsschutz',
-        'Dieselstraße 6–8',
-        '63165 Mühlheim am Main',
-        'Tel: +4961089944981',
-        'E-Mail: info@pro-arbeitsschutz.de',
-        'IBAN: DE90 5065 2124 0008 1426 22',
-      ]
-      const lines: string[] = []
-      for (const s of signatureLines) {
-        lines.push(...doc.splitTextToSize(s, maxWidth))
-      }
-
-      const lineHeight = 12
-      const totalHeight = lines.length * lineHeight
-      const bottomMargin = 40
-
-      // place footer above bottomMargin; if it would overlap content, add a new page
-      let footerStartY = pageHeight - bottomMargin - totalHeight
-      const minGap = 24
-      if (finalY + minGap > footerStartY) {
-        doc.addPage()
-        footerStartY = 60
-      }
-
-      // Draw footer signature lines one-by-one to avoid overlapping and allow clearer spacing
-      let y = footerStartY
-      for (const l of lines) {
-        doc.text(String(l), leftX, y)
-        y += lineHeight
-      }
+    // Footer with IBAN distributed in 4 columns - matching invoice-view.tsx
+    const internal = (doc as unknown as DocWithAutoTable).internal
+    const pageHeight = typeof internal.pageSize.getHeight === 'function'
+      ? internal.pageSize.getHeight!()
+      : (internal.pageSize.height ?? 0)
+    
+    // Footer at bottom of page
+    const footerY = pageHeight - 60
+    
+    // Add a line separator above footer
+    doc.setLineWidth(0.5)
+    doc.setDrawColor(200, 200, 200)
+    doc.line(leftX, footerY - 20, 550, footerY - 20)
+    
+    // Clean, readable footer - single line format
+    doc.setFontSize(9)
+    doc.setTextColor(80, 80, 80)
+    
+    // Single line with proper spacing and readable information
+    const footerText = 'Pro Arbeitsschutz | Dieselstraße 6–8, 63165 Mühlheim am Main | Tel: +4961089944981 | info@pro-arbeitsschutz.com'
+    doc.text(footerText, leftX, footerY)
+    
+    // Second line with banking and VAT info
+    const footerText2 = 'IBAN: DE90 5065 2124 0008 1426 22 | BIC: HELADEF1SLS'
+    doc.text(footerText2, leftX, footerY + 12)
     
 
-    const filename = showPrices ? `invoice-${invoice.id}.pdf` : `invoice-${invoice.id}-no-prices.pdf`;
+    const filename = showPrices ? `rechnung-${invoice.invoiceNumber}.pdf` : `rechnung-${invoice.invoiceNumber}-no-prices.pdf`;
     try { toast.info('PDF wird erstellt...') } catch {}
     doc.save(filename)
   }
@@ -803,15 +801,12 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
                                 const prev = invoices
                                 try {
                                   setInvoices(prev.map(i => i.id === invoice.id ? { ...i, status: newStatus } : i))
-                                  setUpdatingStatusId(invoice.id)
                                   await invoiceService.updateInvoice(invoice.id, { status: newStatus })
                                   toast.success(`Status geändert zu ${formatStatusLabel(s)}`)
                                 } catch (err) {
                                   // revert
                                   setInvoices(prev)
                                   toast.error(err instanceof Error ? err.message : 'Fehler beim Aktualisieren des Status')
-                                } finally {
-                                  setUpdatingStatusId(null)
                                 }
                               }}>
                                 {formatStatusLabel(s)}
