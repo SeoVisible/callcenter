@@ -19,7 +19,7 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
     const userCopy = { ...user }
     delete (userCopy as Record<string, unknown>)['password']
     return NextResponse.json(userCopy)
-  } catch (err) {
+  } catch {
     return NextResponse.json({ error: "Failed to update user" }, { status: 500 })
   }
 }

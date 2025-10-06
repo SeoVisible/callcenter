@@ -129,7 +129,7 @@ export default function DashboardPage() {
       } else {
         setEditingInvoice(invoice)
       }
-    } catch (e) {
+    } catch {
       // fallback to provided invoice
       setEditingInvoice(invoice)
     }
@@ -165,7 +165,7 @@ export default function DashboardPage() {
       const full = await invoiceService.getInvoiceById(viewingInvoice.id)
       if (full) setEditingInvoice(full)
       else setEditingInvoice(viewingInvoice)
-    } catch (e) {
+    } catch {
       setEditingInvoice(viewingInvoice)
     }
     setShowInvoiceForm(true)

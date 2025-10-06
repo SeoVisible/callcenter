@@ -71,7 +71,7 @@ export function DashboardHome({ showStats = true, onNavigate }: { showStats?: bo
         } else {
           if (!cancelled) setInfo(null)
         }
-      } catch (err) {
+      } catch {
         if (!cancelled) {
           // Use a safe fallback so graphs render even if the API fails
           setInfo("Failed to load stats from API — showing fallback values")
@@ -149,7 +149,7 @@ export function DashboardHome({ showStats = true, onNavigate }: { showStats?: bo
                     } else {
                       setInfo(null)
                     }
-                  } catch (err) {
+                  } catch {
                       // On retry failure, show fallback stats so graphs still display
                       setInfo("Wiederholung fehlgeschlagen — Platzhalterwerte werden angezeigt")
                       setStats({

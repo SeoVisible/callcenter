@@ -60,7 +60,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
   const [sendingId, setSendingId] = useState<string | null>(null)
   const [markingPaidId, setMarkingPaidId] = useState<string | null>(null)
 
-  const loadInvoices = async (opts?: { status?: string, sortBy?: string, sortDir?: string, clientId?: string, filterUserId?: string }) => {
+  const loadInvoices = useCallback(async (opts?: { status?: string, sortBy?: string, sortDir?: string, clientId?: string, filterUserId?: string }) => {
     try {
       // If this is the initial load (loading flag), keep that behavior.
       if (!loading) setLoading(true)
@@ -77,7 +77,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
     } finally {
       setLoading(false)
     }
-  }
+  }, [user, loading, filterStatus, filterClient, filterUser, initialFilterUserId])
 
   useEffect(() => {
     // On initial mount, load invoices and pass initialFilterUserId if present

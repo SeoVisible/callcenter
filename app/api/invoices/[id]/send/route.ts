@@ -17,10 +17,11 @@ interface MailDeliveryInfo {
 const prisma = new PrismaClient()
 
 // Function to generate PDF as buffer
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function generateInvoicePDF(invoice: any): Promise<Buffer> {
   const doc = new PDFDocument({ size: 'A4', margin: 50 })
   const streamChunks: Buffer[] = []
-  doc.on('data', (chunk: any) => streamChunks.push(Buffer.from(chunk)))
+  doc.on('data', (chunk: Buffer) => streamChunks.push(chunk))
 
   // Page dimensions
   const pageWidth = doc.page.width - 100
@@ -106,6 +107,7 @@ async function generateInvoicePDF(invoice: any): Promise<Buffer> {
 
   // Table rows
   let subtotal = 0
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   invoice.lineItems.forEach((item: any) => {
     const total = item.unitPrice * item.quantity
     subtotal += total

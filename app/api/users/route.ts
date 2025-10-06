@@ -7,7 +7,8 @@ const prisma = new PrismaClient()
 export async function GET() {
   const users = await prisma.user.findMany()
   // Remove password from response
-  const usersSafe = users.map(({ password, ...u }) => u)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const usersSafe = users.map(({ password: _password, ...u }) => u)
   return NextResponse.json(usersSafe)
 }
 

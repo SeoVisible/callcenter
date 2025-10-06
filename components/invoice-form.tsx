@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 type InvoiceStatus = "pending" | "maker" | "sent" | "paid" | "not_paid" | "completed"
 const toInvoiceStatus = (s: unknown): InvoiceStatus | undefined => {
   const v = String(s)
@@ -73,6 +73,7 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
 
   useEffect(() => {
     loadData()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
 
   useEffect(() => {
@@ -114,7 +115,7 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
     }
   }, [clients, invoice, formData.clientId])
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!user) return
     try {
       const [clientsData, productsData] = await Promise.all([
@@ -141,7 +142,7 @@ export function InvoiceForm({ invoice, clientId, onSuccess, onCancel }: InvoiceF
         description: "Fehler beim Laden der Daten",
       })
     }
-  }
+  }, [user, invoice, formData.clientId])
 
 
 
