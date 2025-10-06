@@ -62,8 +62,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
 
   const loadInvoices = useCallback(async (opts?: { status?: string, sortBy?: string, sortDir?: string, clientId?: string, filterUserId?: string }) => {
     try {
-      // If this is the initial load (loading flag), keep that behavior.
-      if (!loading) setLoading(true)
+      setLoading(true)
       // prefer explicit opts -> component state -> initialFilterUserId
       const statusParam = opts?.status ?? (filterStatus ? String(filterStatus) : undefined)
       const clientParam = opts?.clientId ?? (filterClient ? String(filterClient) : undefined)
@@ -72,12 +71,12 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
       setInvoices(data)
     } catch {
       // Log to console to aid debugging in dev. The UI shows a toast too.
-  console.error("InvoiceList: failed to load invoices")
-  toast.error("Fehler beim Laden der Rechnungen")
+      console.error("InvoiceList: failed to load invoices")
+      toast.error("Fehler beim Laden der Rechnungen")
     } finally {
       setLoading(false)
     }
-  }, [user, loading, filterStatus, filterClient, filterUser, initialFilterUserId])
+  }, [user?.id, user?.role, filterStatus, filterClient, filterUser, initialFilterUserId])
 
   useEffect(() => {
     // On initial mount, load invoices and pass initialFilterUserId if present
@@ -101,20 +100,22 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
         // ignore
       }
     })()
-  }, [user, initialFilterUserId, loadInvoices])
+  }, [user?.id, initialFilterUserId]) // Removed loadInvoices from dependencies to prevent infinite loop
 
   const applyFilters = useCallback(async () => {
+    if (!user?.id) return // Don't apply filters if no user
     try {
+      setLoading(true)
       const statusParam = filterStatus ? String(filterStatus) : undefined
-  const clientParam = filterClient ? String(filterClient) : undefined
-  const userParam = filterUser ? String(filterUser) : undefined
-  // pass caller's user id/role as the auth context, and clientParam and userParam as explicit filters
-  const data = await invoiceService.getAllInvoices(user?.id, user?.role, statusParam, undefined, undefined, clientParam, userParam)
+      const clientParam = filterClient ? String(filterClient) : undefined
+      const userParam = filterUser ? String(filterUser) : undefined
+      // pass caller's user id/role as the auth context, and clientParam and userParam as explicit filters
+      const data = await invoiceService.getAllInvoices(user?.id, user?.role, statusParam, undefined, undefined, clientParam, userParam)
       setInvoices(data)
     } catch {
       toast.error('Filter konnten nicht angewendet werden')
     } finally {
-      // Filter operation complete
+      setLoading(false)
     }
   }, [filterStatus, filterClient, filterUser, user?.id, user?.role])
 
