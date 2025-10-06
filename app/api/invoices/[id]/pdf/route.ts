@@ -95,9 +95,8 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 	currentY += 100
 
 	// Add 'Rechnung' header before table - with 22px left margin
-	doc.fontSize(16).fillColor('#000').font('Helvetica-Bold')
+	doc.fontSize(16).fillColor('#000')
 	doc.text('Rechnung', leftMargin + 22, currentY)
-	doc.font('Helvetica') // Reset font
 	currentY += 25
 
 	// Table structure - matching the exact layout from image
@@ -117,7 +116,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 	doc.rect(leftMargin, tableStartY - 5, pageWidth, 20).fillAndStroke('#f0f0f0', '#cccccc')
 	
 	// Header text - black and bold
-	doc.fontSize(9).fillColor('#000').font('Helvetica-Bold')
+	doc.fontSize(9).fillColor('#000')
 	doc.text('Pos.', colPositions.pos, tableStartY, { width: 25, align: 'center' })
 	doc.text('Menge', colPositions.qty, tableStartY, { width: 35, align: 'center' })
 	doc.text('Artikel-Bezeichnung', colPositions.description, tableStartY, { width: 200 })
@@ -138,7 +137,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 			doc.rect(leftMargin, rowY - 3, pageWidth, 18).fillAndStroke('#fafafa', '#fafafa')
 		}
 		
-		doc.fontSize(9).fillColor('#000').font('Helvetica')
+		doc.fontSize(9).fillColor('#000')
 		doc.text(String(position), colPositions.pos, rowY, { width: 25, align: 'center' })
 		doc.text(String(item.quantity), colPositions.qty, rowY, { width: 35, align: 'center' })
 		doc.text(item.productName + (item.description ? ` - ${item.description}` : ''), colPositions.description, rowY, { width: 200 })
@@ -159,7 +158,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 	const taxAmount = subtotal * (taxRate / 100)
 	const total = subtotal + taxAmount
 	
-	doc.fontSize(10).fillColor('#000').font('Helvetica')
+	doc.fontSize(10).fillColor('#000')
 	
 	// Subtotal
 	doc.text('Zwischensumme:', totalsX, totalsStartY)
@@ -170,12 +169,12 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 	doc.text(`€ ${taxAmount.toFixed(2)}`, totalsX + 100, totalsStartY + 15, { width: 70, align: 'right' })
 	
 	// Total - bold and prominent
-	doc.font('Helvetica-Bold').fontSize(12)
+	doc.fontSize(12)
 	doc.text('Gesamtbetrag:', totalsX, totalsStartY + 35)
 	doc.text(`€ ${total.toFixed(2)}`, totalsX + 100, totalsStartY + 35, { width: 70, align: 'right' })
 	
 	// Payment terms
-	doc.font('Helvetica').fontSize(9).fillColor('#666')
+	doc.fontSize(9).fillColor('#666')
 	doc.text('Zahlbar binnen 14 Tagen netto.', leftMargin, totalsStartY + 70)
 	
 	// Clean footer - simple and readable

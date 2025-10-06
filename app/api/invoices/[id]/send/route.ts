@@ -80,9 +80,8 @@ async function generateInvoicePDF(invoice: any): Promise<Buffer> {
   currentY += 40
 
   // Add 'Rechnung' header before table - with 22px left margin
-  doc.fontSize(16).fillColor('#000').font('Helvetica-Bold')
+  doc.fontSize(16).fillColor('#000')
   doc.text('Rechnung', leftMargin + 22, currentY)
-  doc.font('Helvetica') // Reset font
   currentY += 25
 
   // Table header
