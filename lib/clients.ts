@@ -1,5 +1,6 @@
 export interface Client {
   id: string
+  clientUniqueNumber?: string // K101, K102, etc.
   name: string
   email: string
   phone: string

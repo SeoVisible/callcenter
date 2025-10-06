@@ -63,7 +63,8 @@ export function ClientList({ onAddClient, onEditClient }: ClientListProps) {
       c.company?.toLowerCase().includes(q) ||
       c.email?.toLowerCase().includes(q) ||
       c.phone?.toLowerCase().includes(q) ||
-      c.id?.toLowerCase().includes(q)
+      c.id?.toLowerCase().includes(q) ||
+      c.clientUniqueNumber?.toLowerCase().includes(q)
     )
   })
 
@@ -118,11 +119,12 @@ export function ClientList({ onAddClient, onEditClient }: ClientListProps) {
         </CardHeader>
         <CardContent>
           <div className="mb-4">
-            <Input placeholder="Nach Kunden, Firma, E-Mail, Telefon oder ID suchen..." value={query} onChange={(e) => setQuery(e.target.value)} />
+            <Input placeholder="Nach Kunden-Nr., Name, Firma, E-Mail, Telefon oder ID suchen..." value={query} onChange={(e) => setQuery(e.target.value)} />
           </div>
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Kunden-Nr.</TableHead>
                 <TableHead>Kunde</TableHead>
                 <TableHead>Firma</TableHead>
                 <TableHead>Kontakt</TableHead>
@@ -137,6 +139,11 @@ export function ClientList({ onAddClient, onEditClient }: ClientListProps) {
                   className="cursor-pointer hover:bg-gray-100 dark:hover:bg-[var(--sidebar-item-hover)]"
                   onClick={() => onEditClient(client)}
                 >
+                  <TableCell>
+                    <div className="font-mono text-sm font-semibold text-blue-600 dark:text-blue-400">
+                      {client.clientUniqueNumber || 'Pending...'}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <div>
                       <div className="font-medium">{client.name}</div>

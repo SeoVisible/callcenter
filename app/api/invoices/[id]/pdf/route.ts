@@ -79,14 +79,26 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 	doc.fontSize(10).fillColor('#000')
 	doc.text(`Rechnungsnummer: ${invoiceNumber}`, invoiceInfoX, currentY)
 	doc.text(`Rechnungsdatum: ${invoiceDate}`, invoiceInfoX, currentY + 18)
-	doc.text(`Leistungsdatum: ${invoiceDate}`, invoiceInfoX, currentY + 32)
+	if ((invoice.client as any).clientUniqueNumber) {
+		doc.text(`Kundennummer: ${(invoice.client as any).clientUniqueNumber}`, invoiceInfoX, currentY + 32)
+		doc.text(`Leistungsdatum: ${invoiceDate}`, invoiceInfoX, currentY + 46)
+	} else {
+		doc.text(`Leistungsdatum: ${invoiceDate}`, invoiceInfoX, currentY + 32)
+	}
 	
 	if (invoice.dueDate) {
 		const formattedDueDate = new Date(invoice.dueDate).toLocaleDateString('de-DE')
-		doc.text(`Fälligkeitsdatum: ${formattedDueDate}`, invoiceInfoX, currentY + 46)
+		const dueY = (invoice.client as any).clientUniqueNumber ? currentY + 60 : currentY + 46
+		doc.text(`Fälligkeitsdatum: ${formattedDueDate}`, invoiceInfoX, dueY)
 	}
 	
 	currentY += 100
+
+	// Add 'Rechnung' header before table - with 22px left margin
+	doc.fontSize(16).fillColor('#000').font('Helvetica-Bold')
+	doc.text('Rechnung', leftMargin + 22, currentY)
+	doc.font('Helvetica') // Reset font
+	currentY += 25
 
 	// Table structure - matching the exact layout from image
 	doc.y = currentY + 20

@@ -31,6 +31,7 @@ interface ClientFormProps {
 
 export function ClientForm({ client, onSuccess, onCancel, onViewInvoice }: ClientFormProps & { onViewInvoice?: (invoice: Invoice) => void }) {
   const [createdClient, setCreatedClient] = useState<Client | null>(null)
+  const [mounted, setMounted] = useState(false)
   const { user } = useAuth()
   const [formData, setFormData] = useState({
     name: "",
@@ -49,6 +50,10 @@ export function ClientForm({ client, onSuccess, onCancel, onViewInvoice }: Clien
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [clientInvoices, setClientInvoices] = useState<Invoice[]>([])
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     if (client) {
@@ -151,7 +156,14 @@ export function ClientForm({ client, onSuccess, onCancel, onViewInvoice }: Clien
         <Button variant="outline" size="icon" onClick={onCancel}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-  <CardTitle>{client ? 'Kunde bearbeiten' : 'Neuen Kunden hinzufügen'}</CardTitle>
+        <div className="flex-1">
+          <CardTitle>{client ? 'Kunde bearbeiten' : 'Neuen Kunden hinzufügen'}</CardTitle>
+          {client && mounted && client.clientUniqueNumber && (
+            <p className="text-sm text-muted-foreground mt-1">
+              Kunden-Nr.: <span className="font-mono font-medium">{client.clientUniqueNumber}</span>
+            </p>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -296,8 +308,10 @@ export function ClientForm({ client, onSuccess, onCancel, onViewInvoice }: Clien
             {!createdClient ? (
               <>
                 <Button type="submit" disabled={loading}>
-                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {client ? "Kunde aktualisieren" : "Kunde erstellen"}
+                  <span className="flex items-center">
+                    {mounted && loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {client ? "Kunde aktualisieren" : "Kunde erstellen"}
+                  </span>
                 </Button>
                 <Button type="button" variant="outline" onClick={onCancel}>
                   Abbrechen

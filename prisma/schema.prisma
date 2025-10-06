@@ -33,16 +33,17 @@ model Product {
 }
 
 model Client {
-    id        String    @id @default(uuid())
-    name      String
-    email     String    @unique
-    company   String?
-    address   Json
-    createdBy String
-    notes     String?
-    phone     String
-    createdAt DateTime  @default(now())
-    invoices  Invoice[]
+    id                 String    @id @default(uuid())
+    clientUniqueNumber String?   @unique
+    name               String
+    email              String    @unique
+    company            String?
+    address            Json
+    createdBy          String
+    notes              String?
+    phone              String
+    createdAt          DateTime  @default(now())
+    invoices           Invoice[]
 }
 
 model Invoice {

@@ -189,6 +189,9 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
   const line1Y = invNo ? clientY + 14 : clientY
   if (serviceDate) doc.text(`Auftragsdatum: ${serviceDate}`, invoiceInfoX, line1Y)
   if (invoiceDate) doc.text(`Rechnungsdatum: ${invoiceDate}`, invoiceInfoX, line1Y + 14)
+  if (client?.clientUniqueNumber) {
+    doc.text(`Kundennummer: ${client.clientUniqueNumber}`, invoiceInfoX, line1Y + 28)
+  }
 
   // Items table - headers matching the image exactly
     const head = showPrices ? ['Pos.', 'Menge', 'Artikel-Bezeichnung', 'Einzelpreis', 'Gesamtpreis'] : ['Pos.', 'Menge', 'Artikel-Bezeichnung']
@@ -266,6 +269,13 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
         '2': { cellWidth: descW, halign: 'left' } // Description left
       }
     }
+
+    // Add document type header before table - with 22px left margin
+    const documentType = showPrices ? 'Rechnung' : 'Lieferschein'
+    doc.setFontSize(16)
+    doc.setFont('helvetica', 'bold')
+    doc.text(documentType, 42, clientY + 65) // 20 + 22px margin
+    doc.setFont('helvetica', 'normal') // Reset font style
 
     autoTable(doc, {
       startY: clientY + 80, // Start after client and invoice info sections

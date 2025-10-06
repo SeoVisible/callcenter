@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { PrismaClient } from "@prisma/client"
+import { generateNextClientUniqueNumber } from "@/lib/client-unique-number"
 
 const prisma = new PrismaClient()
 
@@ -49,6 +50,9 @@ export async function POST(req: Request) {
     // If address is a JSON field, you can store it directly. If not, adjust accordingly.
     // Here, let's assume address is a JSON field in the Prisma model (if not, let me know to adjust)
 
+    // Generate unique client number (K101, K102, etc.)
+    const clientUniqueNumber = await generateNextClientUniqueNumber()
+
     const client = await prisma.client.create({
       data: {
         name: data.name,
@@ -58,6 +62,7 @@ export async function POST(req: Request) {
         address: normalizedAddress, // store normalized address object
         notes: data.notes,
         createdBy: data.createdBy,
+        clientUniqueNumber: clientUniqueNumber,
       }
     })
     return NextResponse.json(client)
