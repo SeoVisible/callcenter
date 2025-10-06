@@ -54,7 +54,7 @@ export function StatsSummary() {
           topProducts: (json.topProducts || []).map((r: Record<string, unknown>) => ({ id: String(r.id ?? ''), name: String(r.name ?? ''), quantity: Number(r.quantity ?? 0), revenue: Number(r.revenue ?? 0) })),
           topClients: (json.topClients || []).map((r: Record<string, unknown>) => ({ id: String(r.id ?? ''), name: String(r.name ?? ''), invoiceCount: Number(r.invoiceCount ?? 0), revenue: Number(r.revenue ?? 0) })),
         })
-      } catch (err) {
+      } catch {
         // ignore — leave data null
       } finally {
         if (!cancelled) setLoading(false)

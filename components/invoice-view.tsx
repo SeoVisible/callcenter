@@ -76,7 +76,7 @@ export function InvoiceView({ invoice, onBack, onEdit, onSend }: InvoiceViewProp
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
         const png = canvas.toDataURL('image/png')
         return { dataUrl: png, width: naturalW, height: naturalH }
-      } catch (err) {
+      } catch {
         return null
       }
     }

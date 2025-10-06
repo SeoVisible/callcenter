@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import type { Invoice } from "@/lib/invoices"
 import { formatStatusLabel } from '@/lib/status'
 import { invoiceService } from "@/lib/invoices"
@@ -91,35 +91,19 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
       try {
         const cs = await clientService.getAllClients()
         setClients(cs.map(c => ({ id: c.id, name: c.name })))
-      } catch (e) {
+      } catch {
         // ignore
       }
       try {
         const us = await userService.getAllUsers()
         setUsers(us.map(u => ({ id: u.id, name: u.name })))
-      } catch (e) {
+      } catch {
         // ignore
       }
     })()
-  }, [user])
+  }, [user, initialFilterUserId, loadInvoices])
 
-  // Auto-apply filters when status changes (debounced)
-  useEffect(() => {
-    const t = setTimeout(() => {
-      void applyFilters()
-    }, 250)
-    return () => clearTimeout(t)
-  }, [filterStatus])
-
-  // Auto-apply filters when client or user select changes (debounced)
-  useEffect(() => {
-    const t = setTimeout(() => {
-      void applyFilters()
-    }, 250)
-    return () => clearTimeout(t)
-  }, [filterClient, filterUser])
-
-  const applyFilters = async () => {
+  const applyFilters = useCallback(async () => {
     try {
       const statusParam = filterStatus ? String(filterStatus) : undefined
   const clientParam = filterClient ? String(filterClient) : undefined
@@ -132,7 +116,23 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
     } finally {
       // Filter operation complete
     }
-  }
+  }, [filterStatus, filterClient, filterUser, user?.id, user?.role])
+
+  // Auto-apply filters when status changes (debounced)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      void applyFilters()
+    }, 250)
+    return () => clearTimeout(t)
+  }, [filterStatus, applyFilters])
+
+  // Auto-apply filters when client or user select changes (debounced)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      void applyFilters()
+    }, 250)
+    return () => clearTimeout(t)
+  }, [filterClient, filterUser, applyFilters])
 
   // debounce the query to avoid frequent re-renders while typing
   useEffect(() => {
@@ -286,7 +286,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
         const png = canvas.toDataURL('image/png')
         return { dataUrl: png, width: naturalW, height: naturalH }
-      } catch (err) {
+      } catch {
         return null
       }
     }
@@ -313,7 +313,7 @@ export function InvoiceList({ onAddInvoice, onEditInvoice, onViewInvoice, initia
           logoNaturalH = found.height
           break
         }
-      } catch (e) {
+      } catch {
         // ignore and try next
       }
     }

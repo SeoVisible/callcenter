@@ -87,7 +87,7 @@ class InvoiceService {
     try {
       const res = await fetch(`/api/invoices/${id}`, { credentials: "include" })
       if (res.ok) return res.json()
-    } catch (e) {
+    } catch {
       // ignore and fall back to list search
     }
 
@@ -97,7 +97,7 @@ class InvoiceService {
       if (!listRes.ok) return null
       const all: Invoice[] = await listRes.json()
       return all.find((inv) => inv.id === id) ?? null
-    } catch (e) {
+    } catch {
       return null
     }
   }

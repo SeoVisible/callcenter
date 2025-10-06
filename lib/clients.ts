@@ -71,7 +71,6 @@ class ClientService {
       throw new Error(message)
     }
       const json = await res.json() 
-    // eslint-disable-next-line no-console
       console.debug("clientService.getAllClients: received", Array.isArray(json) ? json.length : typeof json) 
     return json
   }

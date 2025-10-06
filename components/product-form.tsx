@@ -83,9 +83,8 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
         try {
           const s = await productService.fetchProductStats(product.id)
           setStats(s)
-        } catch (err) {
+        } catch {
           // silently ignore stats fetch errors
-          // console.debug('Failed to fetch product stats', err)
         }
       })()
     }
