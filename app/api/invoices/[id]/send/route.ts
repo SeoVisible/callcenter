@@ -30,10 +30,11 @@ async function generateInvoicePDF(invoice: any): Promise<Buffer> {
   // 🔹 Step 2: disable first page so no AFM lookup happens
   const doc = new PDFDocument({ size: "A4", margin: 50, autoFirstPage: false })
   const chunks: Buffer[] = []
-  doc.on("data", (chunk) => chunks.push(chunk))
-  doc.on("error", (err) => {
+  doc.on("data", (chunk: Buffer) => chunks.push(chunk))
+  doc.on("error", (err: Error) => {
     console.error("[PDF] Stream error:", err)
   })
+
 
   // 🔹 Step 3: register and use our embedded font
   doc.registerFont("Body", fontPath)
