@@ -8,7 +8,8 @@ import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
-    const { id } = await context.params
+	try {
+		const { id } = await context.params
 
 	// Fetch invoice with relations
 	const invoice = await prisma.invoice.findUnique({ where: { id }, include: { lineItems: true, client: true } })
@@ -60,32 +61,30 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 			try { console.warn('[PDF] AFM ensure failed (download):', (e as Error).message) } catch {}
 		}
 
-		// Prefer a bundled TTF/OTF font to avoid AFM lookups and register it as Helvetica
+		// Prefer a bundled TTF/OTF font to avoid AFM lookups and register under a custom alias
 		try {
+			let fontSet = false
 			try {
 				const mod = await import('module') as any
 				const req = mod.createRequire(import.meta.url)
 				const ttfPath = req.resolve('dejavu-fonts-ttf/ttf/DejaVuSans.ttf')
-				if (ttfPath) {
-					doc.registerFont('Helvetica', ttfPath)
-					doc.font('Helvetica')
-				}
+				if (ttfPath) { doc.registerFont('Body', ttfPath); doc.font('Body'); fontSet = true }
 			} catch {}
-
-			if (!(doc as any)._font) {
+			if (!fontSet) {
 				const candidates = [
 					process.env.PDF_FONT_PATH,
-					// Fallbacks if module resolution fails
 					path.join(process.cwd(), 'node_modules', 'dejavu-fonts-ttf', 'ttf', 'DejaVuSans.ttf'),
+					path.join(process.cwd(), 'public', 'fonts', 'DejaVuSans.ttf'),
 					path.join(process.cwd(), 'public', 'fonts', 'Inter-Regular.ttf'),
 					path.join(process.cwd(), 'public', 'fonts', 'NotoSans-Regular.ttf'),
 					path.join(process.cwd(), 'public', 'fonts', 'Geist-Regular.ttf'),
-					path.join(process.cwd(), 'public', 'fonts', 'DejaVuSans.ttf'),
 				].filter(Boolean) as string[]
-				for (const p of candidates) { if (fs.existsSync(p)) { doc.registerFont('Helvetica', p); doc.font('Helvetica'); break } }
+				for (const p of candidates) { if (fs.existsSync(p)) { doc.registerFont('Body', p); doc.font('Body'); fontSet = true; break } }
 			}
+			if (!fontSet) { const e: any = new Error('No embeddable TTF font found'); e.code='PDF_FONT_NOT_FOUND'; throw e }
 		} catch (e) {
 			try { console.warn('[PDF] Font selection failed (download):', (e as Error).message) } catch {}
+			throw e
 		}
 
 		const logoPath = path.join(process.cwd(), 'public', 'nifar_logo.jpg')
@@ -266,13 +265,24 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 		doc.end()
 	})
 
-		const uint8 = new Uint8Array(buffer)
-		const invoiceNumberForFilename = (invoice as any).invoiceNumber || invoice.id.slice(-6)
-		const headers = new Headers({
-			'Content-Type': 'application/pdf',
-			'Content-Length': String(buffer.length),
-			'Content-Disposition': `attachment; filename="invoice-${invoiceNumberForFilename}.pdf"`,
-		})
-		return new Response(uint8, { status: 200, headers })
+    const uint8 = new Uint8Array(buffer)
+    const invoiceNumberForFilename = (invoice as any).invoiceNumber || invoice.id.slice(-6)
+    const headers = new Headers({
+      'Content-Type': 'application/pdf',
+      'Content-Length': String(buffer.length),
+      'Content-Disposition': `attachment; filename="invoice-${invoiceNumberForFilename}.pdf"`,
+    })
+    return new Response(uint8, { status: 200, headers })
+  } catch (err) {
+    const anyErr: any = err
+    const body = JSON.stringify({
+      error: 'PDF generation failed',
+      code: anyErr?.code || 'UNKNOWN',
+      stage: anyErr?.stage || 'unknown',
+      message: anyErr instanceof Error ? anyErr.message : String(anyErr),
+      cause: anyErr?.cause,
+    })
+    return new Response(body, { status: 500, headers: { 'content-type': 'application/json' } })
+  }
 }
 

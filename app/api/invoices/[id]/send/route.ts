@@ -50,47 +50,51 @@ async function generateInvoicePDF(invoice: any): Promise<Buffer> {
 
 	// Prefer a bundled TTF/OTF font to avoid AFM lookups in serverless/prod
 	try {
+		let fontSet = false
 		// Best-effort: resolve packaged font path even in serverless (Vercel) bundles
 		try {
 			const mod = await import('module') as any
 			const req = mod.createRequire(import.meta.url)
 			const ttfPath = req.resolve('dejavu-fonts-ttf/ttf/DejaVuSans.ttf')
 			if (ttfPath) {
-				doc.registerFont('Helvetica', ttfPath)
-				doc.font('Helvetica')
+				doc.registerFont('Body', ttfPath)
+				doc.font('Body')
+				fontSet = true
 			}
 		} catch {}
 
-		if (!doc._font) {
+		if (!fontSet) {
 			const candidates = [
 				process.env.PDF_FONT_PATH,
 				// Fallbacks if the above resolution failed
 				path.join(process.cwd(), 'node_modules', 'dejavu-fonts-ttf', 'ttf', 'DejaVuSans.ttf'),
+				path.join(process.cwd(), 'public', 'fonts', 'DejaVuSans.ttf'),
 				path.join(process.cwd(), 'public', 'fonts', 'Inter-Regular.ttf'),
 				path.join(process.cwd(), 'public', 'fonts', 'NotoSans-Regular.ttf'),
 				path.join(process.cwd(), 'public', 'fonts', 'Geist-Regular.ttf'),
-				path.join(process.cwd(), 'public', 'fonts', 'DejaVuSans.ttf'),
 			].filter(Boolean) as string[]
 			for (const p of candidates) {
 				if (fs.existsSync(p)) {
-					doc.registerFont('Helvetica', p)
-					doc.font('Helvetica')
+					doc.registerFont('Body', p)
+					doc.font('Body')
+					fontSet = true
 					break
 				}
 			}
 		}
+
+		if (!fontSet) {
+			const e: any = new Error('No embeddable TTF font found')
+			e.code = 'PDF_FONT_NOT_FOUND'
+			throw e
+		}
 	} catch (e) {
-		// Non-fatal: PDFKit will fallback to core fonts
+		// Fail fast with a clear error to avoid AFM fallback in serverless
 		try { console.warn('[PDF] Font selection failed:', (e as Error).message) } catch {}
+		throw e
 	}
 
 	// After registering/selecting font, create the first page so PDFKit doesn't try to load AFM metrics
-	try {
-		if (!(doc as any)._font) {
-			// As a last resort, pick a core font to avoid undefined state; but we'll attempt to set our TTF above
-			doc.font('Helvetica')
-		}
-	} catch {}
 	// Now create the first page with margins
 	doc.addPage({ size: 'A4', margins: { top: 50, left: 50, right: 50, bottom: 50 } })
 
@@ -380,4 +384,17 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
 			{ status: 500 }
 		)
 	}
+}
+
+// Helpful GET for debugging: tells users to POST and surfaces id
+export async function GET(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
+	const { id } = await context.params
+	return NextResponse.json({
+		error: 'Use POST to send invoice email',
+		id,
+		expect: {
+			method: 'POST',
+			body: { email: 'optional override', subject: 'optional', message: 'optional' },
+		},
+	}, { status: 405 })
 }
