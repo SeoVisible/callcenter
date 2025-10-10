@@ -54,7 +54,7 @@ async function generateInvoicePDF(invoice: any): Promise<Buffer> {
 			const ttfPath = req.resolve('dejavu-fonts-ttf/ttf/DejaVuSans.ttf')
 			if (ttfPath) {
 				doc.registerFont('Helvetica', ttfPath)
-				doc.font(ttfPath)
+				doc.font('Helvetica')
 			}
 		} catch {}
 
@@ -71,7 +71,7 @@ async function generateInvoicePDF(invoice: any): Promise<Buffer> {
 			for (const p of candidates) {
 				if (fs.existsSync(p)) {
 					doc.registerFont('Helvetica', p)
-					doc.font(p)
+					doc.font('Helvetica')
 					break
 				}
 			}

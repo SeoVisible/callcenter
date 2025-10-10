@@ -8,7 +8,7 @@
     "seed": "node prisma/seed.js",
     "start": "next start",
     "lint": "eslint",
-    "postinstall": "prisma generate && node scripts/copy-fonts.js",
+  "postinstall": "prisma generate && node scripts/copy-fonts.js && node scripts/copy-ttf.js",
     "copy-fonts": "node scripts/copy-fonts.js"
   },
   "prisma": {

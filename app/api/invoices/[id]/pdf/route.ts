@@ -62,7 +62,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 				const ttfPath = req.resolve('dejavu-fonts-ttf/ttf/DejaVuSans.ttf')
 				if (ttfPath) {
 					doc.registerFont('Helvetica', ttfPath)
-					doc.font(ttfPath)
+					doc.font('Helvetica')
 				}
 			} catch {}
 
@@ -76,7 +76,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 					path.join(process.cwd(), 'public', 'fonts', 'Geist-Regular.ttf'),
 					path.join(process.cwd(), 'public', 'fonts', 'DejaVuSans.ttf'),
 				].filter(Boolean) as string[]
-				for (const p of candidates) { if (fs.existsSync(p)) { doc.registerFont('Helvetica', p); doc.font(p); break } }
+				for (const p of candidates) { if (fs.existsSync(p)) { doc.registerFont('Helvetica', p); doc.font('Helvetica'); break } }
 			}
 		} catch (e) {
 			try { console.warn('[PDF] Font selection failed (download):', (e as Error).message) } catch {}
