@@ -153,7 +153,19 @@ class InvoiceService {
       try {
         if (contentType.includes('application/json')) {
           const data = await res.json()
-          message = data?.error || message
+          const base = data?.error || message
+          // Surface structured diagnostics when available
+          const parts: string[] = []
+          if (data?.code) parts.push(`code=${String(data.code)}`)
+          if (data?.stage) parts.push(`stage=${String(data.stage)}`)
+          if (data?.message && data.message !== data.error) parts.push(`message=${String(data.message)}`)
+          if (data?.cause) parts.push(`cause=${String(data.cause)}`)
+          if (data?.details && data.details !== data.error) parts.push(`details=${String(data.details)}`)
+          // SMTP diagnostics
+          if (typeof data?.host !== 'undefined') parts.push(`host=${String(data.host)}`)
+          if (typeof data?.port !== 'undefined') parts.push(`port=${String(data.port)}`)
+          if (typeof data?.secure !== 'undefined') parts.push(`secure=${String(data.secure)}`)
+          message = parts.length ? `${base} — ${parts.join(', ')}` : base
         } else {
           const text = await res.text()
           // Include a short snippet of any HTML/text response
