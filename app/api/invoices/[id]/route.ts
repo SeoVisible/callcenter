@@ -14,7 +14,7 @@ function computeTotals(invoice: InvoiceWithRelations) {
     (sum: number, item) => sum + item.total,
     0
   )
-  const taxAmount = subtotal * (Number(invoice.taxRate) / 100)
+  const taxAmount = subtotal * Number(invoice.taxRate)
   const total = subtotal + taxAmount
   return { subtotal, taxAmount, total, lineItemsWithTotal }
 }
