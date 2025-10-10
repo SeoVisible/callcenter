@@ -1,9 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server"
-// ✅ Force Node runtime – PDFKit won’t work on Edge
 export const runtime = "nodejs"
 import { PrismaClient } from "@prisma/client"
-// @ts-expect-error - nodemailer ESM import
+// @ts-expect-error
 import nodemailer from "nodemailer"
 import PDFDocument from "pdfkit"
 import path from "path"
@@ -11,42 +10,45 @@ import fs from "fs"
 
 const prisma = new PrismaClient()
 
-// === FIXED PDF GENERATOR (no Helvetica.afm errors) ===
+// === STABLE PDF GENERATOR (no Helvetica.afm dependency) ===
 async function generateInvoicePDF(invoice: any): Promise<Buffer> {
-  // 🔹 Step 1: find a TTF font to embed (any will do)
+  // Step 1: Find a .ttf font and verify existence
   const fontCandidates = [
     path.join(process.cwd(), "public", "fonts", "DejaVuSans.ttf"),
     path.join(process.cwd(), "public", "fonts", "Inter-Regular.ttf"),
     path.join(process.cwd(), "public", "fonts", "NotoSans-Regular.ttf"),
-    path.join(process.cwd(), "public", "fonts", "Geist-Regular.ttf"),
   ]
   const fontPath = fontCandidates.find((p) => fs.existsSync(p))
   if (!fontPath) {
     throw new Error(
-      "No embeddable font found. Place a .ttf file in public/fonts/ (e.g., DejaVuSans.ttf)."
+      "No TTF font found. Please add a font like DejaVuSans.ttf in /public/fonts/"
     )
   }
 
-  // 🔹 Step 2: disable first page so no AFM lookup happens
-  const doc = new PDFDocument({ size: "A4", margin: 50, autoFirstPage: false })
+  // Step 2: Create PDF document WITHOUT triggering Helvetica
+  const PDFKit = (await import("pdfkit")).default
+  const doc = new PDFKit({ size: "A4", margin: 50, autoFirstPage: false })
   const chunks: Buffer[] = []
+
   doc.on("data", (chunk: Buffer) => chunks.push(chunk))
   doc.on("error", (err: Error) => {
     console.error("[PDF] Stream error:", err)
   })
 
-
-  // 🔹 Step 3: register and use our embedded font
+  // Step 3: Register and select the font BEFORE adding pages
   doc.registerFont("Body", fontPath)
   doc.font("Body")
 
-  // 🔹 Step 4: now safely add the first page
+  // Step 4: Now safely add first page
   doc.addPage({ size: "A4", margins: { top: 50, left: 50, right: 50, bottom: 50 } })
 
-  const pageWidth = doc.page.width - 100
-  const leftMargin = 50
+  // Utility
   const formatEUR = (v: number) =>
     new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(v || 0)
+
+  // Layout
+  const pageWidth = doc.page.width - 100
+  const leftMargin = 50
 
   // Header logo or fallback
   try {
@@ -61,7 +63,7 @@ async function generateInvoicePDF(invoice: any): Promise<Buffer> {
     doc.fontSize(24).fillColor("#e74c3c").text("Kompakt Arbeitsschutz", leftMargin, 50)
   }
 
-  // Top-right company info
+  // Company info
   const companyX = 400
   doc.fontSize(10).fillColor("#000")
   doc.text("Pro Arbeitsschutz", companyX, 50)
@@ -70,60 +72,55 @@ async function generateInvoicePDF(invoice: any): Promise<Buffer> {
   doc.text("Tel: +4961089944981", companyX, 82)
   doc.text("info@pro-arbeitsschutz.com", companyX, 94)
 
+  // Invoice details
   let currentY = 130
   const invoiceNumber = invoice.invoiceNumber || "N/A"
   const orderDate = new Date(invoice.createdAt).toLocaleDateString("de-DE")
-  const invoiceDate = (invoice as any).issueDate
+  const invoiceDate = invoice.issueDate
     ? new Date(invoice.issueDate).toLocaleDateString("de-DE")
     : orderDate
 
-  // Title
   doc.fontSize(20).fillColor("#000").text("RECHNUNG", leftMargin, currentY)
   currentY += 40
 
-  // Client info (LEFT)
+  // Client info
   if (invoice.client) {
     doc.fontSize(11).fillColor("#000").text(invoice.client.name, leftMargin, currentY)
-    const clientAddress = invoice.client.address as any
-    if (typeof clientAddress === "string") {
-      doc.fontSize(10).text(clientAddress, leftMargin, currentY + 14)
-    } else if (clientAddress) {
-      if (clientAddress.street)
-        doc.fontSize(10).text(clientAddress.street, leftMargin, currentY + 14)
-      if (clientAddress.zipCode || clientAddress.city) {
-        const cityLine = [clientAddress.zipCode, clientAddress.city].filter(Boolean).join(" ")
-        doc.text(cityLine, leftMargin, currentY + 28)
-      }
+    const addr = invoice.client.address as any
+    if (typeof addr === "string") doc.fontSize(10).text(addr, leftMargin, currentY + 14)
+    else if (addr) {
+      if (addr.street) doc.text(addr.street, leftMargin, currentY + 14)
+      if (addr.zipCode || addr.city)
+        doc.text([addr.zipCode, addr.city].filter(Boolean).join(" "), leftMargin, currentY + 28)
     }
   }
 
-  // Invoice metadata (RIGHT)
-  const invoiceInfoX = 350
-  doc.fontSize(10).fillColor("#000")
-  doc.text(`Rechnungsnummer: ${invoiceNumber}`, invoiceInfoX, currentY)
+  // Meta info
+  const metaX = 350
+  doc.fontSize(10)
+  doc.text(`Rechnungsnummer: ${invoiceNumber}`, metaX, currentY)
   let metaY = currentY + 14
-  doc.text(`Auftragsdatum: ${orderDate}`, invoiceInfoX, metaY)
+  doc.text(`Auftragsdatum: ${orderDate}`, metaX, metaY)
   metaY += 14
-  doc.text(`Rechnungsdatum: ${invoiceDate}`, invoiceInfoX, metaY)
+  doc.text(`Rechnungsdatum: ${invoiceDate}`, metaX, metaY)
   metaY += 14
   if ((invoice.client as any)?.clientUniqueNumber) {
-    doc.text(`Kundennummer: ${(invoice.client as any).clientUniqueNumber}`, invoiceInfoX, metaY)
+    doc.text(`Kundennummer: ${(invoice.client as any).clientUniqueNumber}`, metaX, metaY)
     metaY += 14
   }
-  doc.text(`Leistungsdatum: ${invoiceDate}`, invoiceInfoX, metaY)
+  doc.text(`Leistungsdatum: ${invoiceDate}`, metaX, metaY)
   metaY += 14
   if (invoice.dueDate) {
     const due = new Date(invoice.dueDate).toLocaleDateString("de-DE")
-    doc.text(`Fälligkeitsdatum: ${due}`, invoiceInfoX, metaY)
+    doc.text(`Fälligkeitsdatum: ${due}`, metaX, metaY)
   }
 
+  // Table
   currentY += 100
   doc.fontSize(16).fillColor("#000").text("Rechnung", leftMargin + 22, currentY)
   currentY += 25
   doc.y = currentY + 20
-  const tableStartY = doc.y
-
-  // Table header
+  const startY = doc.y
   const col = {
     pos: leftMargin,
     qty: leftMargin + 30,
@@ -131,23 +128,23 @@ async function generateInvoicePDF(invoice: any): Promise<Buffer> {
     unit: leftMargin + 280,
     total: leftMargin + 350,
   }
-  doc.rect(leftMargin, tableStartY - 5, pageWidth, 20).fillAndStroke("#f0f0f0", "#cccccc")
-  doc.fontSize(9).fillColor("#000")
-  doc.text("Pos.", col.pos, tableStartY, { width: 25, align: "center" })
-  doc.text("Menge", col.qty, tableStartY, { width: 35, align: "center" })
-  doc.text("Artikel-Bezeichnung", col.desc, tableStartY, { width: 200 })
-  doc.text("Einzelpreis", col.unit, tableStartY, { width: 60, align: "right" })
-  doc.text("Gesamtpreis", col.total, tableStartY, { width: 70, align: "right" })
 
-  let rowY = tableStartY + 25
+  doc.rect(leftMargin, startY - 5, pageWidth, 20).fillAndStroke("#f0f0f0", "#cccccc")
+  doc.fontSize(9).fillColor("#000")
+  doc.text("Pos.", col.pos, startY, { width: 25, align: "center" })
+  doc.text("Menge", col.qty, startY, { width: 35, align: "center" })
+  doc.text("Artikel-Bezeichnung", col.desc, startY, { width: 200 })
+  doc.text("Einzelpreis", col.unit, startY, { width: 60, align: "right" })
+  doc.text("Gesamtpreis", col.total, startY, { width: 70, align: "right" })
+
+  let rowY = startY + 25
   let subtotal = 0
-  let position = 1
   invoice.lineItems.forEach((item: any, i: number) => {
-    const lineTotal = Number(item.unitPrice || 0) * Number(item.quantity || 0)
-    subtotal += lineTotal
+    const totalLine = (item.unitPrice || 0) * (item.quantity || 0)
+    subtotal += totalLine
     if (i % 2 === 0) doc.rect(leftMargin, rowY - 3, pageWidth, 18).fill("#fafafa")
     doc.fontSize(9).fillColor("#000")
-    doc.text(String(position), col.pos, rowY, { width: 25, align: "center" })
+    doc.text(String(i + 1), col.pos, rowY, { width: 25, align: "center" })
     doc.text(String(item.quantity), col.qty, rowY, { width: 35, align: "center" })
     doc.text(
       item.productName + (item.description ? ` - ${item.description}` : ""),
@@ -156,9 +153,8 @@ async function generateInvoicePDF(invoice: any): Promise<Buffer> {
       { width: 200 }
     )
     doc.text(formatEUR(item.unitPrice || 0), col.unit, rowY, { width: 60, align: "right" })
-    doc.text(formatEUR(lineTotal), col.total, rowY, { width: 70, align: "right" })
+    doc.text(formatEUR(totalLine), col.total, rowY, { width: 70, align: "right" })
     rowY += 18
-    position++
   })
   doc.moveTo(leftMargin, rowY + 5).lineTo(leftMargin + pageWidth, rowY + 5).stroke("#cccccc")
 
@@ -169,7 +165,7 @@ async function generateInvoicePDF(invoice: any): Promise<Buffer> {
   const taxAmount = subtotal * (taxRate / 100)
   const total = subtotal + taxAmount
 
-  doc.fontSize(10).fillColor("#000")
+  doc.fontSize(10)
   doc.text("Gesamt Netto:", totalsX, totalsY)
   doc.text(formatEUR(subtotal), totalsX + 100, totalsY, { width: 70, align: "right" })
   doc.text(`Umsatzsteuer (${taxRate}%):`, totalsX, totalsY + 15)
@@ -179,10 +175,9 @@ async function generateInvoicePDF(invoice: any): Promise<Buffer> {
   doc.text(formatEUR(total), totalsX + 100, totalsY + 35, { width: 70, align: "right" })
 
   doc.fontSize(9).fillColor("#666").text("Zahlbar binnen 14 Tagen netto.", leftMargin, totalsY + 70)
-
   const footerY = 750
   doc.moveTo(leftMargin, footerY - 10).lineTo(leftMargin + pageWidth, footerY - 10).stroke("#cccccc")
-  doc.fontSize(9).fillColor("#666")
+  doc.fontSize(9)
   doc.text(
     "Pro Arbeitsschutz | Dieselstraße 6–8, 63165 Mühlheim am Main | Tel: +4961089944981 | info@pro-arbeitsschutz.com",
     leftMargin,
@@ -191,12 +186,12 @@ async function generateInvoicePDF(invoice: any): Promise<Buffer> {
   doc.text("IBAN: DE90 5065 2124 0008 1426 22 | BIC: HELADEF1SLS", leftMargin, footerY + 12)
 
   doc.end()
-  return await new Promise<Buffer>((resolve) => {
+  return await new Promise<Buffer>((resolve) =>
     doc.on("end", () => resolve(Buffer.concat(chunks)))
-  })
+  )
 }
 
-// === EMAIL SENDER ===
+// === EMAIL ROUTE ===
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params
@@ -210,11 +205,9 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     if (!invoice) return NextResponse.json({ error: "Invoice not found" }, { status: 404 })
 
     const email = overrideEmail || invoice.client?.email
-    if (!email) {
-      return NextResponse.json({ error: "Missing email address" }, { status: 400 })
-    }
+    if (!email) return NextResponse.json({ error: "Missing client email" }, { status: 400 })
 
-    const pdfBuffer = await generateInvoicePDF(invoice)
+    const pdf = await generateInvoicePDF(invoice)
 
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || "mail.privateemail.com",
@@ -227,49 +220,35 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
       tls: { rejectUnauthorized: false },
     })
 
-    const invoiceNumber = invoice.invoiceNumber || invoice.id.slice(-6)
-    const mailSubject = subject.includes("Rechnung")
-      ? subject
-      : `Rechnung ${invoiceNumber}`
+    const invNum = invoice.invoiceNumber || invoice.id.slice(-6)
+    const mailSubject = subject.includes("Rechnung") ? subject : `Rechnung ${invNum}`
     const mailText =
       message ||
-      `Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie die Rechnung ${invoiceNumber}.\n\nMit freundlichen Grüßen\nPro Arbeitsschutz Team`
+      `Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie die Rechnung ${invNum}.\n\nMit freundlichen Grüßen\nPro Arbeitsschutz Team`
 
-    const mailOptions = {
+    const info = await transporter.sendMail({
       from: process.env.SMTP_USER || "info@pro-arbeitsschutz.com",
       to: email,
       subject: mailSubject,
       text: mailText,
-      attachments: [
-        {
-          filename: `Rechnung-${invoiceNumber}.pdf`,
-          content: pdfBuffer,
-          contentType: "application/pdf",
-        },
-      ],
-    }
+      attachments: [{ filename: `Rechnung-${invNum}.pdf`, content: pdf }],
+    })
 
-    const info = await transporter.sendMail(mailOptions)
     return NextResponse.json({
       success: true,
       messageId: info.messageId,
       accepted: info.accepted,
-      rejected: info.rejected || [],
     })
-  } catch (error) {
-    console.error("Email send error:", error)
+  } catch (err) {
+    console.error("Email send error:", err)
     return NextResponse.json(
-      { error: "Failed to send email", details: (error as Error).message },
+      { error: "Failed to send email", details: (err as Error).message },
       { status: 500 }
     )
   }
 }
 
-// Optional GET debug helper
 export async function GET(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params
-  return NextResponse.json({
-    usage: "POST to this endpoint to send invoice email",
-    id,
-  })
+  return NextResponse.json({ message: "Use POST to send invoice email", id })
 }
