@@ -6,7 +6,7 @@ import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
-	const { id } = await context.params
+    const { id } = await context.params
 
 	// Fetch invoice with relations
 	const invoice = await prisma.invoice.findUnique({ where: { id }, include: { lineItems: true, client: true } })
@@ -47,7 +47,9 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 					}
 				}
 			}
-		} catch {}
+		} catch (e) {
+			try { console.warn('[PDF] AFM ensure failed (download):', (e as Error).message) } catch {}
+		}
 
 		// Prefer a bundled TTF/OTF font to avoid AFM lookups
 		try {
@@ -61,16 +63,19 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 				path.join(process.cwd(), 'public', 'fonts', 'DejaVuSans.ttf'),
 			].filter(Boolean) as string[]
 			for (const p of candidates) { if (fs.existsSync(p)) { doc.font(p); break } }
-		} catch {}
+		} catch (e) {
+			try { console.warn('[PDF] Font selection failed (download):', (e as Error).message) } catch {}
+		}
 
 		const logoPath = path.join(process.cwd(), 'public', 'nifar_logo.jpg')
 		if (fs.existsSync(logoPath)) {
 			doc.image(logoPath, leftMargin, 50, { width: 180, height: 60 })
 		}
-	} catch {
+	} catch (e) {
 		// Fallback - draw company name as header
 		doc.fontSize(24).fillColor('#e74c3c').text('Kompakt Arbeitsschutz', leftMargin, 50)
 		doc.fontSize(12).fillColor('#666').text('Berufsbekleidung von Kopf bis Fuß', leftMargin, 80)
+		try { console.warn('[PDF] Header image failed (download):', (e as Error).message) } catch {}
 	}
 
 	// Top right company details - simple and clean
@@ -230,7 +235,13 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 	// Wait for PDF to finish and collect buffer
 	const buffer: Buffer = await new Promise((resolve, reject) => {
 		doc.on('end', () => resolve(Buffer.concat(streamChunks)))
-		doc.on('error', reject)
+		doc.on('error', (err: unknown) => {
+			const e: any = new Error('PDFKit stream error')
+			e.code = 'PDFKIT_STREAM_ERROR'
+			e.stage = 'finalize'
+			e.cause = err instanceof Error ? err.message : String(err)
+			reject(e)
+		})
 		doc.end()
 	})
 

@@ -29,7 +29,10 @@ async function generateInvoicePDF(invoice: any): Promise<Buffer> {
 				}
 			}
 		}
-	} catch {}
+	} catch (e) {
+		// Non-fatal: keep going but log context
+		try { console.warn('[PDF] AFM ensure failed:', (e as Error).message) } catch {}
+	}
 
 	const doc = new PDFDocument({ size: "A4", margin: 50 })
 	const streamChunks: Buffer[] = []
@@ -53,7 +56,10 @@ async function generateInvoicePDF(invoice: any): Promise<Buffer> {
 		for (const p of candidates) {
 			if (fs.existsSync(p)) { doc.font(p); break }
 		}
-	} catch {}
+	} catch (e) {
+		// Non-fatal: PDFKit will fallback to core fonts
+		try { console.warn('[PDF] Font selection failed:', (e as Error).message) } catch {}
+	}
 
 	// Page layout
 	const pageWidth = doc.page.width - 100
@@ -65,9 +71,10 @@ async function generateInvoicePDF(invoice: any): Promise<Buffer> {
 		if (fs.existsSync(logoPath)) {
 			doc.image(logoPath, leftMargin, 50, { width: 180, height: 60 })
 		}
-	} catch {
+	} catch (e) {
 		doc.fontSize(24).fillColor("#e74c3c").text("Kompakt Arbeitsschutz", leftMargin, 50)
 		doc.fontSize(12).fillColor("#666").text("Berufsbekleidung von Kopf bis Fuß", leftMargin, 80)
+		try { console.warn('[PDF] Header image failed:', (e as Error).message) } catch {}
 	}
 
 	// Top right company info
@@ -221,7 +228,13 @@ async function generateInvoicePDF(invoice: any): Promise<Buffer> {
 
 	const buffer: Buffer = await new Promise((resolve, reject) => {
 		doc.on("end", () => resolve(Buffer.concat(streamChunks)))
-		doc.on("error", reject)
+		doc.on("error", (err: unknown) => {
+			const e: any = new Error('PDFKit stream error')
+			e.code = 'PDFKIT_STREAM_ERROR'
+			e.stage = 'finalize'
+			e.cause = err instanceof Error ? err.message : String(err)
+			reject(e)
+		})
 		doc.end()
 	})
 	return buffer
@@ -253,8 +266,13 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
 		try {
 			pdfBuffer = await generateInvoicePDF(invoice)
 		} catch (err) {
+			const anyErr: any = err
 			const msg = err instanceof Error ? err.message : String(err)
-			return NextResponse.json({ error: "PDF generation failed", details: msg }, { status: 500 })
+			const code = anyErr?.code || 'PDF_GENERATION_ERROR'
+			const stage = anyErr?.stage || 'unknown'
+			const cause = anyErr?.cause || undefined
+			try { console.error('[PDF] generation error:', { code, stage, msg, cause }) } catch {}
+			return NextResponse.json({ error: 'PDF generation failed', code, stage, message: msg, cause }, { status: 500 })
 		}
 
 		// Configure SMTP from environment (production-safe)
