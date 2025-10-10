@@ -2,8 +2,9 @@
 import { NextRequest, NextResponse } from "next/server"
 export const runtime = "nodejs"
 import { PrismaClient } from "@prisma/client"
-// @ts-expect-error
+// @ts-expect-error - nodemailer lacks proper ESM typings in Next.js API routes
 import nodemailer from "nodemailer"
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import PDFDocument from "pdfkit"
 import path from "path"
 import fs from "fs"
