@@ -12,6 +12,25 @@ async function generateInvoicePDF(invoice: any): Promise<Buffer> {
 	const fs = await import("fs")
 	const path = await import("path")
 
+	// Ensure AFM fonts are available in Next.js runtime (prevents ENOENT on Helvetica.afm)
+	try {
+		const sourceDir = path.join(process.cwd(), 'node_modules', 'pdfkit', 'js', 'data')
+		const nextServerDir = path.join(process.cwd(), '.next', 'server')
+		const targetDir = path.join(nextServerDir, 'vendor-chunks', 'data')
+		if (fs.existsSync(nextServerDir) && fs.existsSync(sourceDir)) {
+			if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true })
+			for (const file of fs.readdirSync(sourceDir)) {
+				if (file.endsWith('.afm')) {
+					const src = path.join(sourceDir, file)
+					const dest = path.join(targetDir, file)
+					if (!fs.existsSync(dest)) {
+						try { fs.copyFileSync(src, dest) } catch {}
+					}
+				}
+			}
+		}
+	} catch {}
+
 	const doc = new PDFDocument({ size: "A4", margin: 50 })
 	const streamChunks: Buffer[] = []
 	doc.on("data", (chunk: any) => streamChunks.push(Buffer.from(chunk)))
@@ -204,18 +223,50 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
 			)
 		}
 
-		const pdfBuffer = await generateInvoicePDF(invoice)
+		// Generate PDF (surface errors clearly)
+		let pdfBuffer: Buffer
+		try {
+			pdfBuffer = await generateInvoicePDF(invoice)
+		} catch (err) {
+			const msg = err instanceof Error ? err.message : String(err)
+			return NextResponse.json({ error: "PDF generation failed", details: msg }, { status: 500 })
+		}
+
+		// Configure SMTP from environment (production-safe)
+		const SMTP_HOST = process.env.SMTP_HOST || 'mail.privateemail.com'
+		const SMTP_PORT = Number(process.env.SMTP_PORT || 587)
+		const SMTP_SECURE = process.env.SMTP_SECURE === 'true' || SMTP_PORT === 465
+		const SMTP_USER = process.env.SMTP_USER
+		const SMTP_PASS = process.env.SMTP_PASS
+		const SMTP_FROM = process.env.SMTP_FROM || SMTP_USER || 'info@pro-arbeitsschutz.com'
+
+		if (!SMTP_USER || !SMTP_PASS) {
+			return NextResponse.json(
+				{ error: 'SMTP credentials missing', details: 'Set SMTP_USER and SMTP_PASS in environment' },
+				{ status: 500 }
+			)
+		}
 
 		const transporter = nodemailer.createTransport({
-			host: "mail.privateemail.com",
-			port: 587,
-			secure: false,
-			auth: {
-				user: process.env.SMTP_USER || "info@pro-arbeitsschutz.com",
-				pass: process.env.SMTP_PASS || "proarbeit2024!",
-			},
-			tls: { rejectUnauthorized: false },
+			host: SMTP_HOST,
+			port: SMTP_PORT,
+			secure: SMTP_SECURE,
+			requireTLS: !SMTP_SECURE,
+			auth: { user: SMTP_USER, pass: SMTP_PASS },
+			connectionTimeout: 20000,
+			greetingTimeout: 20000,
+			socketTimeout: 30000,
+			logger: process.env.SMTP_DEBUG === 'true',
+			debug: process.env.SMTP_DEBUG === 'true',
 		})
+
+		// Verify SMTP connection first for clearer errors in production
+		try {
+			await transporter.verify()
+		} catch (err) {
+			const msg = err instanceof Error ? err.message : String(err)
+			return NextResponse.json({ error: 'SMTP verification failed', details: msg, host: SMTP_HOST, port: SMTP_PORT, secure: SMTP_SECURE }, { status: 500 })
+		}
 
 		const invoiceNumber = invoice.invoiceNumber || invoice.id.slice(-6)
 		const emailSubject = subject.includes("Rechnung")
@@ -226,7 +277,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
 			`Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie die Rechnung ${invoiceNumber}.\n\nMit freundlichen Grüßen\nPro Arbeitsschutz Team`
 
 		const mailOptions = {
-			from: process.env.SMTP_USER || "info@pro-arbeitsschutz.com",
+			from: SMTP_FROM,
 			to: email,
 			subject: emailSubject,
 			text: emailMessage,
