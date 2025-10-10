@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest } from "next/server"
+// Ensure Node.js runtime (PDFKit is not compatible with Edge runtime)
+export const runtime = 'nodejs'
 import PDFDocument from 'pdfkit'
 import { PrismaClient } from '@prisma/client'
 
@@ -12,14 +14,18 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 	const invoice = await prisma.invoice.findUnique({ where: { id }, include: { lineItems: true, client: true } })
 	if (!invoice) return new Response(JSON.stringify({ error: 'Invoice not found' }), { status: 404 })
 
-	// Stream PDF to buffer
-	const doc = new PDFDocument({ size: 'A4', margin: 50 })
+	// Stream PDF to buffer, avoid AFM lookup by creating page after font registration
+	const doc = new PDFDocument({ size: 'A4', margin: 50, autoFirstPage: false })
 	const streamChunks: Buffer[] = []
 	doc.on('data', (chunk: any) => streamChunks.push(Buffer.from(chunk)))
 
 	// Currency formatter (German / EUR)
 	const formatEUR = (value: number) =>
 		new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(Number(value || 0))
+
+	// After font has been selected/registered below, add the first page
+	// Create the page early so subsequent calls to doc.page are valid
+	doc.addPage({ size: 'A4', margins: { top: 50, left: 50, right: 50, bottom: 50 } })
 
 	// Page dimensions
 	const pageWidth = doc.page.width - 100 // Account for margins

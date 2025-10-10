@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server"
+// Ensure Node.js runtime (PDFKit is not compatible with Edge runtime)
+export const runtime = 'nodejs'
 import { PrismaClient } from "@prisma/client"
 // @ts-expect-error - nodemailer ESM default import lacks type definitions in this setup
 import nodemailer from "nodemailer"
@@ -37,7 +39,8 @@ async function generateInvoicePDF(invoice: any): Promise<Buffer> {
 		try { console.warn('[PDF] AFM ensure failed:', (e as Error).message) } catch {}
 	}
 
-	const doc = new PDFDocument({ size: "A4", margin: 50 })
+	// Avoid default Helvetica AFM lookup by deferring page creation until after we register a TTF font
+	const doc = new PDFDocument({ size: "A4", margin: 50, autoFirstPage: false })
 	const streamChunks: Buffer[] = []
 	doc.on("data", (chunk: any) => streamChunks.push(Buffer.from(chunk)))
 
@@ -80,6 +83,16 @@ async function generateInvoicePDF(invoice: any): Promise<Buffer> {
 		// Non-fatal: PDFKit will fallback to core fonts
 		try { console.warn('[PDF] Font selection failed:', (e as Error).message) } catch {}
 	}
+
+	// After registering/selecting font, create the first page so PDFKit doesn't try to load AFM metrics
+	try {
+		if (!(doc as any)._font) {
+			// As a last resort, pick a core font to avoid undefined state; but we'll attempt to set our TTF above
+			doc.font('Helvetica')
+		}
+	} catch {}
+	// Now create the first page with margins
+	doc.addPage({ size: 'A4', margins: { top: 50, left: 50, right: 50, bottom: 50 } })
 
 	// Page layout
 	const pageWidth = doc.page.width - 100
