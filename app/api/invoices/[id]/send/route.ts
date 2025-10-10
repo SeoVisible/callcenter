@@ -35,6 +35,26 @@ async function generateInvoicePDF(invoice: any): Promise<Buffer> {
 	const streamChunks: Buffer[] = []
 	doc.on("data", (chunk: any) => streamChunks.push(Buffer.from(chunk)))
 
+	// Currency formatter (German / EUR)
+	const formatEUR = (value: number) =>
+		new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(Number(value || 0))
+
+	// Prefer a bundled TTF/OTF font to avoid AFM lookups in serverless/prod
+	try {
+		const candidates = [
+			process.env.PDF_FONT_PATH,
+			// Packaged TTF fallback from node_modules
+			path.join(process.cwd(), 'node_modules', 'dejavu-fonts-ttf', 'ttf', 'DejaVuSans.ttf'),
+			path.join(process.cwd(), 'public', 'fonts', 'Inter-Regular.ttf'),
+			path.join(process.cwd(), 'public', 'fonts', 'NotoSans-Regular.ttf'),
+			path.join(process.cwd(), 'public', 'fonts', 'Geist-Regular.ttf'),
+			path.join(process.cwd(), 'public', 'fonts', 'DejaVuSans.ttf'),
+		].filter(Boolean) as string[]
+		for (const p of candidates) {
+			if (fs.existsSync(p)) { doc.font(p); break }
+		}
+	} catch {}
+
 	// Page layout
 	const pageWidth = doc.page.width - 100
 	const leftMargin = 50
@@ -54,12 +74,17 @@ async function generateInvoicePDF(invoice: any): Promise<Buffer> {
 	const companyX = 400
 	doc.fontSize(10).fillColor("#000")
 	doc.text("Pro Arbeitsschutz", companyX, 50)
-	doc.text("Tel: +4961089944981", companyX, 65)
-	doc.text("info@pro-arbeitsschutz.com", companyX, 80)
+	doc.text("Dieselstraße 6–8", companyX, 58)
+	doc.text("63165 Mühlheim am Main", companyX, 70)
+	doc.text("Tel: +4961089944981", companyX, 82)
+	doc.text("info@pro-arbeitsschutz.com", companyX, 94)
 
 	let currentY = 130
 	const invoiceNumber = invoice.invoiceNumber || "N/A"
-	const invoiceDate = new Date(invoice.createdAt).toLocaleDateString("de-DE")
+	const orderDate = new Date(invoice.createdAt).toLocaleDateString("de-DE")
+	const invoiceDate = (invoice as any).issueDate
+		? new Date((invoice as any).issueDate).toLocaleDateString("de-DE")
+		: orderDate
 
 	// Title
 	doc.fontSize(20).fillColor("#000").text("RECHNUNG", leftMargin, currentY)
@@ -67,18 +92,17 @@ async function generateInvoicePDF(invoice: any): Promise<Buffer> {
 
 	// Client info (LEFT)
 	if (invoice.client) {
-		doc.fontSize(10).fillColor("#000").text("Rechnungsadresse:", leftMargin, currentY)
-		doc.fontSize(11).text(invoice.client.name, leftMargin, currentY + 18)
+		doc.fontSize(11).fillColor("#000").text(invoice.client.name, leftMargin, currentY)
 
 		const clientAddress = invoice.client.address as any
 		if (typeof clientAddress === "string") {
-			doc.fontSize(10).text(clientAddress, leftMargin, currentY + 32)
+			doc.fontSize(10).text(clientAddress, leftMargin, currentY + 14)
 		} else if (clientAddress) {
 			if (clientAddress.street)
-				doc.fontSize(10).text(clientAddress.street, leftMargin, currentY + 32)
+				doc.fontSize(10).text(clientAddress.street, leftMargin, currentY + 14)
 			if (clientAddress.zipCode || clientAddress.city) {
 				const cityLine = [clientAddress.zipCode, clientAddress.city].filter(Boolean).join(" ")
-				doc.text(cityLine, leftMargin, currentY + 46)
+				doc.text(cityLine, leftMargin, currentY + 28)
 			}
 		}
 	}
@@ -87,19 +111,20 @@ async function generateInvoicePDF(invoice: any): Promise<Buffer> {
 	const invoiceInfoX = 350
 	doc.fontSize(10).fillColor("#000")
 	doc.text(`Rechnungsnummer: ${invoiceNumber}`, invoiceInfoX, currentY)
-	doc.text(`Rechnungsdatum: ${invoiceDate}`, invoiceInfoX, currentY + 18)
-
-	if ((invoice.client as any).clientUniqueNumber) {
-		doc.text(`Kundennummer: ${(invoice.client as any).clientUniqueNumber}`, invoiceInfoX, currentY + 32)
-		doc.text(`Leistungsdatum: ${invoiceDate}`, invoiceInfoX, currentY + 46)
-	} else {
-		doc.text(`Leistungsdatum: ${invoiceDate}`, invoiceInfoX, currentY + 32)
+	let metaY = currentY + 14
+	doc.text(`Auftragsdatum: ${orderDate}`, invoiceInfoX, metaY)
+	metaY += 14
+	doc.text(`Rechnungsdatum: ${invoiceDate}`, invoiceInfoX, metaY)
+	metaY += 14
+	if ((invoice.client as any)?.clientUniqueNumber) {
+		doc.text(`Kundennummer: ${(invoice.client as any).clientUniqueNumber}`, invoiceInfoX, metaY)
+		metaY += 14
 	}
-
+	doc.text(`Leistungsdatum: ${invoiceDate}`, invoiceInfoX, metaY)
+	metaY += 14
 	if (invoice.dueDate) {
-		const formattedDueDate = new Date(invoice.dueDate).toLocaleDateString("de-DE")
-		const dueY = (invoice.client as any).clientUniqueNumber ? currentY + 60 : currentY + 46
-		doc.text(`Fälligkeitsdatum: ${formattedDueDate}`, invoiceInfoX, dueY)
+		const formattedDueDate = new Date(invoice.dueDate).toLocaleDateString('de-DE')
+		doc.text(`Fälligkeitsdatum: ${formattedDueDate}`, invoiceInfoX, metaY)
 	}
 
 	currentY += 100
@@ -150,11 +175,11 @@ async function generateInvoicePDF(invoice: any): Promise<Buffer> {
 			rowY,
 			{ width: 200 }
 		)
-		doc.text(`€ ${(item.unitPrice ?? 0).toFixed(2)}`, colPositions.unit, rowY, {
+		doc.text(formatEUR(Number(item.unitPrice ?? 0)), colPositions.unit, rowY, {
 			width: 60,
 			align: "right",
 		})
-		doc.text(`€ ${lineTotal.toFixed(2)}`, colPositions.total, rowY, {
+		doc.text(formatEUR(lineTotal), colPositions.total, rowY, {
 			width: 70,
 			align: "right",
 		})
@@ -173,13 +198,13 @@ async function generateInvoicePDF(invoice: any): Promise<Buffer> {
 	const total = subtotal + taxAmount
 
 	doc.fontSize(10).fillColor("#000")
-	doc.text("Zwischensumme:", totalsX, totalsStartY)
-	doc.text(`€ ${subtotal.toFixed(2)}`, totalsX + 100, totalsStartY, { width: 70, align: "right" })
-	doc.text(`Umsatzsteuer ${taxRate}%:`, totalsX, totalsStartY + 15)
-	doc.text(`€ ${taxAmount.toFixed(2)}`, totalsX + 100, totalsStartY + 15, { width: 70, align: "right" })
+	doc.text("Gesamt Netto:", totalsX, totalsStartY)
+	doc.text(formatEUR(subtotal), totalsX + 100, totalsStartY, { width: 70, align: "right" })
+	doc.text(`Umsatzsteuer (${taxRate}%):`, totalsX, totalsStartY + 15)
+	doc.text(formatEUR(taxAmount), totalsX + 100, totalsStartY + 15, { width: 70, align: "right" })
 	doc.fontSize(12)
-	doc.text("Gesamtbetrag:", totalsX, totalsStartY + 35)
-	doc.text(`€ ${total.toFixed(2)}`, totalsX + 100, totalsStartY + 35, { width: 70, align: "right" })
+	doc.text("Gesamt Brutto:", totalsX, totalsStartY + 35)
+	doc.text(formatEUR(total), totalsX + 100, totalsStartY + 35, { width: 70, align: "right" })
 
 	doc.fontSize(9).fillColor("#666").text("Zahlbar binnen 14 Tagen netto.", leftMargin, totalsStartY + 70)
 
@@ -298,7 +323,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
 			rejected: info.rejected || [],
 		})
 	} catch (error) {
-		console.error("Email send error:", error)
+		console.error("Email send error:", error instanceof Error ? error.stack || error.message : String(error))
 		return NextResponse.json(
 			{ error: "Failed to send email", details: (error as Error).message },
 			{ status: 500 }

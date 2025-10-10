@@ -17,14 +17,52 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 	const streamChunks: Buffer[] = []
 	doc.on('data', (chunk: any) => streamChunks.push(Buffer.from(chunk)))
 
+	// Currency formatter (German / EUR)
+	const formatEUR = (value: number) =>
+		new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(Number(value || 0))
+
 	// Page dimensions
 	const pageWidth = doc.page.width - 100 // Account for margins
 	const leftMargin = 50
 
-	// Header with logo and company info
+	// Header with logo and company info + AFM ensure and TTF fallback
 	try {
 		const fs = await import('fs')
 		const path = await import('path')
+
+		// Ensure AFM fonts are available in Next.js runtime (prevents ENOENT on Helvetica.afm)
+		try {
+			const sourceDir = path.join(process.cwd(), 'node_modules', 'pdfkit', 'js', 'data')
+			const nextServerDir = path.join(process.cwd(), '.next', 'server')
+			const targetDir = path.join(nextServerDir, 'vendor-chunks', 'data')
+			if (fs.existsSync(nextServerDir) && fs.existsSync(sourceDir)) {
+				if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true })
+				for (const file of fs.readdirSync(sourceDir)) {
+					if (file.endsWith('.afm')) {
+						const src = path.join(sourceDir, file)
+						const dest = path.join(targetDir, file)
+						if (!fs.existsSync(dest)) {
+							try { fs.copyFileSync(src, dest) } catch {}
+						}
+					}
+				}
+			}
+		} catch {}
+
+		// Prefer a bundled TTF/OTF font to avoid AFM lookups
+		try {
+			const candidates = [
+				process.env.PDF_FONT_PATH,
+				// Packaged TTF fallback from node_modules
+				path.join(process.cwd(), 'node_modules', 'dejavu-fonts-ttf', 'ttf', 'DejaVuSans.ttf'),
+				path.join(process.cwd(), 'public', 'fonts', 'Inter-Regular.ttf'),
+				path.join(process.cwd(), 'public', 'fonts', 'NotoSans-Regular.ttf'),
+				path.join(process.cwd(), 'public', 'fonts', 'Geist-Regular.ttf'),
+				path.join(process.cwd(), 'public', 'fonts', 'DejaVuSans.ttf'),
+			].filter(Boolean) as string[]
+			for (const p of candidates) { if (fs.existsSync(p)) { doc.font(p); break } }
+		} catch {}
+
 		const logoPath = path.join(process.cwd(), 'public', 'nifar_logo.jpg')
 		if (fs.existsSync(logoPath)) {
 			doc.image(logoPath, leftMargin, 50, { width: 180, height: 60 })
@@ -39,13 +77,18 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 	const companyX = 400
 	doc.fontSize(10).fillColor('#000')
 	doc.text('Pro Arbeitsschutz', companyX, 50)
-	doc.text('Tel: +4961089944981', companyX, 65)
-	doc.text('info@pro-arbeitsschutz.com', companyX, 80)
+	doc.text('Dieselstraße 6–8', companyX, 58)
+	doc.text('63165 Mühlheim am Main', companyX, 70)
+	doc.text('Tel: +4961089944981', companyX, 82)
+	doc.text('info@pro-arbeitsschutz.com', companyX, 94)
 	// Layout: Client info on LEFT, Invoice info on RIGHT
 	let currentY = 130
 	
 	const invoiceNumber = invoice.invoiceNumber || 'N/A'
-	const invoiceDate = new Date(invoice.createdAt).toLocaleDateString('de-DE')
+	const orderDate = new Date(invoice.createdAt).toLocaleDateString('de-DE')
+	const invoiceDate = (invoice as any).issueDate
+		? new Date((invoice as any).issueDate).toLocaleDateString('de-DE')
+		: orderDate
 	
 	// RECHNUNG title
 	doc.fontSize(20).fillColor('#000')
@@ -55,21 +98,18 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 	
 	// LEFT SIDE: Client address section
 	if (invoice.client) {
-		doc.fontSize(10).fillColor('#000')
-		doc.text('Rechnungsadresse:', leftMargin, currentY)
-		
-		doc.fontSize(11)
-		doc.text(invoice.client.name, leftMargin, currentY + 18)
+		doc.fontSize(11).fillColor('#000')
+		doc.text(invoice.client.name, leftMargin, currentY)
 		
 		// Handle address as JSON object
 		const clientAddress = invoice.client.address as any
 		if (typeof clientAddress === 'string') {
-			doc.fontSize(10).text(clientAddress, leftMargin, currentY + 32)
+			doc.fontSize(10).text(clientAddress, leftMargin, currentY + 14)
 		} else if (clientAddress) {
-			if (clientAddress.street) doc.fontSize(10).text(clientAddress.street, leftMargin, currentY + 32)
+			if (clientAddress.street) doc.fontSize(10).text(clientAddress.street, leftMargin, currentY + 14)
 			if (clientAddress.zipCode || clientAddress.city) {
 				const cityLine = [clientAddress.zipCode, clientAddress.city].filter(Boolean).join(' ')
-				doc.text(cityLine, leftMargin, currentY + 46)
+				doc.text(cityLine, leftMargin, currentY + 28)
 			}
 		}
 	}
@@ -78,18 +118,20 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 	const invoiceInfoX = 350
 	doc.fontSize(10).fillColor('#000')
 	doc.text(`Rechnungsnummer: ${invoiceNumber}`, invoiceInfoX, currentY)
-	doc.text(`Rechnungsdatum: ${invoiceDate}`, invoiceInfoX, currentY + 18)
-	if ((invoice.client as any).clientUniqueNumber) {
-		doc.text(`Kundennummer: ${(invoice.client as any).clientUniqueNumber}`, invoiceInfoX, currentY + 32)
-		doc.text(`Leistungsdatum: ${invoiceDate}`, invoiceInfoX, currentY + 46)
-	} else {
-		doc.text(`Leistungsdatum: ${invoiceDate}`, invoiceInfoX, currentY + 32)
+	let metaY = currentY + 14
+	doc.text(`Auftragsdatum: ${orderDate}`, invoiceInfoX, metaY)
+	metaY += 14
+	doc.text(`Rechnungsdatum: ${invoiceDate}`, invoiceInfoX, metaY)
+	metaY += 14
+	if ((invoice.client as any)?.clientUniqueNumber) {
+		doc.text(`Kundennummer: ${(invoice.client as any).clientUniqueNumber}`, invoiceInfoX, metaY)
+		metaY += 14
 	}
-	
+	doc.text(`Leistungsdatum: ${invoiceDate}`, invoiceInfoX, metaY)
+	metaY += 14
 	if (invoice.dueDate) {
 		const formattedDueDate = new Date(invoice.dueDate).toLocaleDateString('de-DE')
-		const dueY = (invoice.client as any).clientUniqueNumber ? currentY + 60 : currentY + 46
-		doc.text(`Fälligkeitsdatum: ${formattedDueDate}`, invoiceInfoX, dueY)
+		doc.text(`Fälligkeitsdatum: ${formattedDueDate}`, invoiceInfoX, metaY)
 	}
 	
 	currentY += 100
@@ -141,8 +183,8 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 		doc.text(String(position), colPositions.pos, rowY, { width: 25, align: 'center' })
 		doc.text(String(item.quantity), colPositions.qty, rowY, { width: 35, align: 'center' })
 		doc.text(item.productName + (item.description ? ` - ${item.description}` : ''), colPositions.description, rowY, { width: 200 })
-		doc.text(`€ ${(item.unitPrice ?? 0).toFixed(2)}`, colPositions.unit, rowY, { width: 60, align: 'right' })
-		doc.text(`€ ${lineTotal.toFixed(2)}`, colPositions.total, rowY, { width: 70, align: 'right' })
+		doc.text(formatEUR(Number(item.unitPrice ?? 0)), colPositions.unit, rowY, { width: 60, align: 'right' })
+		doc.text(formatEUR(lineTotal), colPositions.total, rowY, { width: 70, align: 'right' })
 		
 		rowY += 18
 		position++
@@ -160,18 +202,18 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 	
 	doc.fontSize(10).fillColor('#000')
 	
-	// Subtotal
-	doc.text('Zwischensumme:', totalsX, totalsStartY)
-	doc.text(`€ ${subtotal.toFixed(2)}`, totalsX + 100, totalsStartY, { width: 70, align: 'right' })
+	// Subtotal (Net), Tax, Total (Gross) with German labels
+	doc.text('Gesamt Netto:', totalsX, totalsStartY)
+	doc.text(formatEUR(subtotal), totalsX + 100, totalsStartY, { width: 70, align: 'right' })
 	
 	// Tax - clear and readable
-	doc.text(`Umsatzsteuer ${taxRate}%:`, totalsX, totalsStartY + 15)
-	doc.text(`€ ${taxAmount.toFixed(2)}`, totalsX + 100, totalsStartY + 15, { width: 70, align: 'right' })
+	doc.text(`Umsatzsteuer (${taxRate}%):`, totalsX, totalsStartY + 15)
+	doc.text(formatEUR(taxAmount), totalsX + 100, totalsStartY + 15, { width: 70, align: 'right' })
 	
 	// Total - bold and prominent
 	doc.fontSize(12)
-	doc.text('Gesamtbetrag:', totalsX, totalsStartY + 35)
-	doc.text(`€ ${total.toFixed(2)}`, totalsX + 100, totalsStartY + 35, { width: 70, align: 'right' })
+	doc.text('Gesamt Brutto:', totalsX, totalsStartY + 35)
+	doc.text(formatEUR(total), totalsX + 100, totalsStartY + 35, { width: 70, align: 'right' })
 	
 	// Payment terms
 	doc.fontSize(9).fillColor('#666')
