@@ -34,15 +34,18 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 		try {
 			const sourceDir = path.join(process.cwd(), 'node_modules', 'pdfkit', 'js', 'data')
 			const nextServerDir = path.join(process.cwd(), '.next', 'server')
-			const targetDir = path.join(nextServerDir, 'vendor-chunks', 'data')
+			const targets = [
+				path.join(nextServerDir, 'vendor-chunks', 'data'),
+				path.join(nextServerDir, 'chunks', 'data'), // Vercel path variant
+			]
 			if (fs.existsSync(nextServerDir) && fs.existsSync(sourceDir)) {
-				if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true })
+				for (const dir of targets) { if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true }) }
 				for (const file of fs.readdirSync(sourceDir)) {
 					if (file.endsWith('.afm')) {
 						const src = path.join(sourceDir, file)
-						const dest = path.join(targetDir, file)
-						if (!fs.existsSync(dest)) {
-							try { fs.copyFileSync(src, dest) } catch {}
+						for (const dir of targets) {
+							const dest = path.join(dir, file)
+							if (!fs.existsSync(dest)) { try { fs.copyFileSync(src, dest) } catch {} }
 						}
 					}
 				}
@@ -51,18 +54,30 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 			try { console.warn('[PDF] AFM ensure failed (download):', (e as Error).message) } catch {}
 		}
 
-		// Prefer a bundled TTF/OTF font to avoid AFM lookups
+		// Prefer a bundled TTF/OTF font to avoid AFM lookups and register it as Helvetica
 		try {
-			const candidates = [
-				process.env.PDF_FONT_PATH,
-				// Packaged TTF fallback from node_modules
-				path.join(process.cwd(), 'node_modules', 'dejavu-fonts-ttf', 'ttf', 'DejaVuSans.ttf'),
-				path.join(process.cwd(), 'public', 'fonts', 'Inter-Regular.ttf'),
-				path.join(process.cwd(), 'public', 'fonts', 'NotoSans-Regular.ttf'),
-				path.join(process.cwd(), 'public', 'fonts', 'Geist-Regular.ttf'),
-				path.join(process.cwd(), 'public', 'fonts', 'DejaVuSans.ttf'),
-			].filter(Boolean) as string[]
-			for (const p of candidates) { if (fs.existsSync(p)) { doc.font(p); break } }
+			try {
+				const mod = await import('module') as any
+				const req = mod.createRequire(import.meta.url)
+				const ttfPath = req.resolve('dejavu-fonts-ttf/ttf/DejaVuSans.ttf')
+				if (ttfPath) {
+					doc.registerFont('Helvetica', ttfPath)
+					doc.font(ttfPath)
+				}
+			} catch {}
+
+			if (!(doc as any)._font) {
+				const candidates = [
+					process.env.PDF_FONT_PATH,
+					// Fallbacks if module resolution fails
+					path.join(process.cwd(), 'node_modules', 'dejavu-fonts-ttf', 'ttf', 'DejaVuSans.ttf'),
+					path.join(process.cwd(), 'public', 'fonts', 'Inter-Regular.ttf'),
+					path.join(process.cwd(), 'public', 'fonts', 'NotoSans-Regular.ttf'),
+					path.join(process.cwd(), 'public', 'fonts', 'Geist-Regular.ttf'),
+					path.join(process.cwd(), 'public', 'fonts', 'DejaVuSans.ttf'),
+				].filter(Boolean) as string[]
+				for (const p of candidates) { if (fs.existsSync(p)) { doc.registerFont('Helvetica', p); doc.font(p); break } }
+			}
 		} catch (e) {
 			try { console.warn('[PDF] Font selection failed (download):', (e as Error).message) } catch {}
 		}
