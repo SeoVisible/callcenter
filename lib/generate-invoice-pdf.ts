@@ -33,44 +33,45 @@ interface Invoice {
 // -----------------------------------------------------
 // Function
 // -----------------------------------------------------
-export async function generateInvoicePDF(invoice: any): Promise<Buffer> {
-  // ✅ Patch PDFKit to skip Helvetica.afm lookup
-  try {
-    const AnyPDF: any = PDFDocument as any
-    const proto = AnyPDF?.prototype
-    if (proto && !proto.__noCoreFontsPatched) {
-      const original = proto.initFonts
-      proto.initFonts = function () {
-        this._fontFamilies = {}
-        this._fontCount = 0
-        this._fontSize = 12
-        this._font = null
-        this._registeredFonts = {}
-        // 👇 Prevent Helvetica.afm load
-      }
-      proto.__noCoreFontsPatched = true
-      proto.__initFontsOriginal = original
-      console.log("[PDF] Core font patch applied — Helvetica.afm disabled")
-    }
-  } catch (e) {
-    console.warn("[PDF] Font patch failed:", e)
-  }
-
-  // ✅ Create doc & define chunks before using them
+export async function generateInvoicePDF(invoice: Invoice): Promise<Buffer> {
+  // ✅ Create PDF document
   const doc = new PDFDocument({ size: "A4", margin: 50, autoFirstPage: false })
-  const streamChunks: Buffer[] = [] // ← define first!
-
+  const streamChunks: Buffer[] = []
   doc.on("data", (chunk: Buffer) => streamChunks.push(Buffer.from(chunk)))
 
-  // ✅ You can safely use Helvetica now
-  doc.font("Helvetica")
+  // ✅ Register and use DejaVuSans font (safe for Vercel)
+  let fontSet = false
+  const fontCandidates = [
+    path.join(process.cwd(), "node_modules/dejavu-fonts-ttf/ttf/DejaVuSans.ttf"),
+    path.join(process.cwd(), "public/fonts/DejaVuSans.ttf"),
+  ]
 
-  // Currency formatter (German / EUR)
+  for (const p of fontCandidates) {
+    if (fs.existsSync(p)) {
+      try {
+        doc.registerFont("Body", p)
+        doc.font("Body")
+        fontSet = true
+        console.log("[PDF] Using font:", p)
+        break
+      } catch (err) {
+        console.warn("[PDF] Failed to register font from", p, err)
+      }
+    }
+  }
+
+  if (!fontSet) {
+    throw new Error(
+      "DejaVuSans.ttf not found — install with `npm install dejavu-fonts-ttf` or place in /public/fonts/"
+    )
+  }
+
+  // ✅ Currency formatter (German / EUR)
   const formatEUR = (v: number) =>
     new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(Number(v || 0))
 
   // -----------------------------------------------------
-  // Start Page
+  // Page setup
   // -----------------------------------------------------
   doc.addPage()
   const pageWidth = doc.page.width - 100
@@ -208,9 +209,8 @@ export async function generateInvoicePDF(invoice: any): Promise<Buffer> {
   doc.text("IBAN: DE90 5065 2124 0008 1426 22 | BIC: HELADEF1SLS", left, footerY + 12)
 
   // -----------------------------------------------------
-  // Return PDF Buffer
+  // Return Buffer
   // -----------------------------------------------------
-  // ✅ Finalize & return buffer
   const buffer: Buffer = await new Promise((resolve, reject) => {
     doc.on("end", () => resolve(Buffer.concat(streamChunks)))
     doc.on("error", reject)
