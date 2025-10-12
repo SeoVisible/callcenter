@@ -16,6 +16,24 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 	if (!invoice) return new Response(JSON.stringify({ error: 'Invoice not found' }), { status: 404 })
 
 	// Stream PDF to buffer, avoid AFM lookup by creating page after font registration
+	// Also defensively patch PDFKit to not set Helvetica by default
+	try {
+		const AnyPDF: any = (PDFDocument as unknown)
+		const proto: any = (AnyPDF && AnyPDF.prototype) || undefined
+		if (proto && !proto.__noCoreFontsPatched) {
+			const original = proto.initFonts
+			proto.initFonts = function () {
+				this._fontFamilies = {}
+				this._fontCount = 0
+				this._fontSize = 12
+				this._font = null
+				this._registeredFonts = {}
+				// Intentionally skip default core font selection
+			}
+			proto.__noCoreFontsPatched = true
+			proto.__initFontsOriginal = original
+		}
+	} catch {}
 	const doc = new PDFDocument({ size: 'A4', margin: 50, autoFirstPage: false })
 	const streamChunks: Buffer[] = []
 	doc.on('data', (chunk: any) => streamChunks.push(Buffer.from(chunk)))
@@ -24,69 +42,46 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 	const formatEUR = (value: number) =>
 		new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(Number(value || 0))
 
-	// After font has been selected/registered below, add the first page
-	// Create the page early so subsequent calls to doc.page are valid
+	// Register and select an embedded TTF BEFORE adding the first page to avoid core font AFM
+	try {
+		const fs = await import('fs')
+		const path = await import('path')
+		let fontSet = false
+		// Prefer resolving from node_modules
+		try {
+			const mod = await import('module') as any
+			const req = mod.createRequire(import.meta.url)
+			const ttfPath = req.resolve('dejavu-fonts-ttf/ttf/DejaVuSans.ttf')
+			if (ttfPath) { doc.registerFont('Body', ttfPath); doc.font('Body'); fontSet = true }
+		} catch {}
+		if (!fontSet) {
+			const candidates = [
+				process.env.PDF_FONT_PATH,
+				path.join(process.cwd(), 'node_modules', 'dejavu-fonts-ttf', 'ttf', 'DejaVuSans.ttf'),
+				path.join(process.cwd(), 'public', 'fonts', 'DejaVuSans.ttf'),
+				path.join(process.cwd(), 'public', 'fonts', 'Inter-Regular.ttf'),
+				path.join(process.cwd(), 'public', 'fonts', 'NotoSans-Regular.ttf'),
+				path.join(process.cwd(), 'public', 'fonts', 'Geist-Regular.ttf'),
+			].filter(Boolean) as string[]
+			for (const p of candidates) { if (fs.existsSync(p)) { doc.registerFont('Body', p); doc.font('Body'); fontSet = true; break } }
+		}
+		if (!fontSet) { const e: any = new Error('No embeddable TTF font found'); e.code='PDF_FONT_NOT_FOUND'; throw e }
+	} catch (e) {
+		const anyE: any = e
+		throw Object.assign(new Error('Font setup failed'), { code: anyE?.code || 'PDF_FONT_SETUP_FAILED', stage: 'font', cause: anyE?.message })
+	}
+
+	// Now safely add the first page (no Helvetica involved)
 	doc.addPage({ size: 'A4', margins: { top: 50, left: 50, right: 50, bottom: 50 } })
 
 	// Page dimensions
 	const pageWidth = doc.page.width - 100 // Account for margins
 	const leftMargin = 50
 
-	// Header with logo and company info + AFM ensure and TTF fallback
+	// Header with logo and company info
 	try {
 		const fs = await import('fs')
 		const path = await import('path')
-
-		// Ensure AFM fonts are available in Next.js runtime (prevents ENOENT on Helvetica.afm)
-		try {
-			const sourceDir = path.join(process.cwd(), 'node_modules', 'pdfkit', 'js', 'data')
-			const nextServerDir = path.join(process.cwd(), '.next', 'server')
-			const targets = [
-				path.join(nextServerDir, 'vendor-chunks', 'data'),
-				path.join(nextServerDir, 'chunks', 'data'), // Vercel path variant
-			]
-			if (fs.existsSync(nextServerDir) && fs.existsSync(sourceDir)) {
-				for (const dir of targets) { if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true }) }
-				for (const file of fs.readdirSync(sourceDir)) {
-					if (file.endsWith('.afm')) {
-						const src = path.join(sourceDir, file)
-						for (const dir of targets) {
-							const dest = path.join(dir, file)
-							if (!fs.existsSync(dest)) { try { fs.copyFileSync(src, dest) } catch {} }
-						}
-					}
-				}
-			}
-		} catch (e) {
-			try { console.warn('[PDF] AFM ensure failed (download):', (e as Error).message) } catch {}
-		}
-
-		// Prefer a bundled TTF/OTF font to avoid AFM lookups and register under a custom alias
-		try {
-			let fontSet = false
-			try {
-				const mod = await import('module') as any
-				const req = mod.createRequire(import.meta.url)
-				const ttfPath = req.resolve('dejavu-fonts-ttf/ttf/DejaVuSans.ttf')
-				if (ttfPath) { doc.registerFont('Body', ttfPath); doc.font('Body'); fontSet = true }
-			} catch {}
-			if (!fontSet) {
-				const candidates = [
-					process.env.PDF_FONT_PATH,
-					path.join(process.cwd(), 'node_modules', 'dejavu-fonts-ttf', 'ttf', 'DejaVuSans.ttf'),
-					path.join(process.cwd(), 'public', 'fonts', 'DejaVuSans.ttf'),
-					path.join(process.cwd(), 'public', 'fonts', 'Inter-Regular.ttf'),
-					path.join(process.cwd(), 'public', 'fonts', 'NotoSans-Regular.ttf'),
-					path.join(process.cwd(), 'public', 'fonts', 'Geist-Regular.ttf'),
-				].filter(Boolean) as string[]
-				for (const p of candidates) { if (fs.existsSync(p)) { doc.registerFont('Body', p); doc.font('Body'); fontSet = true; break } }
-			}
-			if (!fontSet) { const e: any = new Error('No embeddable TTF font found'); e.code='PDF_FONT_NOT_FOUND'; throw e }
-		} catch (e) {
-			try { console.warn('[PDF] Font selection failed (download):', (e as Error).message) } catch {}
-			throw e
-		}
-
 		const logoPath = path.join(process.cwd(), 'public', 'nifar_logo.jpg')
 		if (fs.existsSync(logoPath)) {
 			doc.image(logoPath, leftMargin, 50, { width: 180, height: 60 })

@@ -4,8 +4,6 @@ export const runtime = "nodejs"
 import { PrismaClient } from "@prisma/client"
 // @ts-expect-error - nodemailer lacks proper ESM typings in Next.js API routes
 import nodemailer from "nodemailer"
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import PDFDocument from "pdfkit"
 import path from "path"
 import fs from "fs"
 
@@ -14,21 +12,47 @@ const prisma = new PrismaClient()
 // === STABLE PDF GENERATOR (no Helvetica.afm dependency) ===
 async function generateInvoicePDF(invoice: any): Promise<Buffer> {
   // Step 1: Find a .ttf font and verify existence
-  const fontCandidates = [
-    path.join(process.cwd(), "public", "fonts", "DejaVuSans.ttf"),
-    path.join(process.cwd(), "public", "fonts", "Inter-Regular.ttf"),
-    path.join(process.cwd(), "public", "fonts", "NotoSans-Regular.ttf"),
-  ]
-  const fontPath = fontCandidates.find((p) => fs.existsSync(p))
+  let fontPath: string | undefined
+  try {
+    // Prefer bundled TTF from node_modules via createRequire to avoid core fonts
+    const mod = await import('module') as any
+    const req = mod.createRequire(import.meta.url)
+    fontPath = req.resolve('dejavu-fonts-ttf/ttf/DejaVuSans.ttf')
+  } catch {}
   if (!fontPath) {
-    throw new Error(
-      "No TTF font found. Please add a font like DejaVuSans.ttf in /public/fonts/"
-    )
+    const fontCandidates = [
+      process.env.PDF_FONT_PATH,
+      path.join(process.cwd(), "node_modules", "dejavu-fonts-ttf", "ttf", "DejaVuSans.ttf"),
+      path.join(process.cwd(), "public", "fonts", "DejaVuSans.ttf"),
+      path.join(process.cwd(), "public", "fonts", "Inter-Regular.ttf"),
+      path.join(process.cwd(), "public", "fonts", "NotoSans-Regular.ttf"),
+    ].filter(Boolean) as string[]
+    fontPath = fontCandidates.find((p) => fs.existsSync(p))
+  }
+  if (!fontPath) {
+    const err: any = new Error("No TTF font found for PDF generation")
+    err.code = 'PDF_FONT_NOT_FOUND'
+    throw err
   }
 
   // Step 2: Create PDF document WITHOUT triggering Helvetica
-  const PDFKit = (await import("pdfkit")).default
-  const doc = new PDFKit({ size: "A4", margin: 50, autoFirstPage: false })
+  const PDFKitMod: any = await import("pdfkit")
+  const BasePDF = PDFKitMod.default as any
+  // Subclass to override initFonts and avoid default Helvetica
+  const SafePDF = class extends BasePDF {
+    constructor(...args: any[]) {
+      super(...args)
+    }
+    initFonts() {
+      this._fontFamilies = {}
+      this._fontCount = 0
+      this._fontSize = 12
+      this._font = null
+      this._registeredFonts = {}
+      // Do NOT call this.font('Helvetica')
+    }
+  }
+  const doc = new SafePDF({ size: "A4", margin: 50, autoFirstPage: false })
   const chunks: Buffer[] = []
 
   doc.on("data", (chunk: Buffer) => chunks.push(chunk))

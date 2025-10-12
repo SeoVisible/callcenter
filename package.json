@@ -3,13 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node scripts/copy-fonts.js && next dev",
+    "dev": "next dev",
     "build": "next build",
     "seed": "node prisma/seed.js",
     "start": "next start",
     "lint": "eslint",
-  "postinstall": "prisma generate && node scripts/copy-fonts.js && node scripts/copy-ttf.js",
-    "copy-fonts": "node scripts/copy-fonts.js"
+  "postinstall": "prisma generate"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
