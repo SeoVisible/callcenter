@@ -34,51 +34,43 @@ interface Invoice {
 // Function
 // -----------------------------------------------------
 export async function generateInvoicePDF(invoice: Invoice): Promise<Buffer> {
-  // ✅ Create PDF document
   const doc = new PDFDocument({ size: "A4", margin: 50, autoFirstPage: false })
   const streamChunks: Buffer[] = []
   doc.on("data", (chunk: Buffer) => streamChunks.push(Buffer.from(chunk)))
 
-  // ✅ Register and use DejaVuSans font (safe for Vercel)
-  let fontSet = false
-  const fontCandidates = [
+  // ✅ Register ONLY DejaVuSans font — no Helvetica ever
+  const fontPaths = [
     path.join(process.cwd(), "node_modules/dejavu-fonts-ttf/ttf/DejaVuSans.ttf"),
     path.join(process.cwd(), "public/fonts/DejaVuSans.ttf"),
   ]
 
-  for (const p of fontCandidates) {
-    if (fs.existsSync(p)) {
-      try {
-        doc.registerFont("Body", p)
-        doc.font("Body")
-        fontSet = true
-        console.log("[PDF] Using font:", p)
-        break
-      } catch (err) {
-        console.warn("[PDF] Failed to register font from", p, err)
-      }
+  let fontLoaded = false
+  for (const fp of fontPaths) {
+    if (fs.existsSync(fp)) {
+      doc.registerFont("Body", fp)
+      doc.font("Body")
+      fontLoaded = true
+      console.log("[PDF] Using embedded font:", fp)
+      break
     }
   }
 
-  if (!fontSet) {
-    throw new Error(
-      "DejaVuSans.ttf not found — install with `npm install dejavu-fonts-ttf` or place in /public/fonts/"
-    )
+  if (!fontLoaded) {
+    throw new Error("❌ DejaVuSans.ttf not found. Install it with `npm i dejavu-fonts-ttf` or put it in public/fonts/")
   }
 
-  // ✅ Currency formatter (German / EUR)
   const formatEUR = (v: number) =>
     new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(Number(v || 0))
 
   // -----------------------------------------------------
-  // Page setup
+  // Page
   // -----------------------------------------------------
   doc.addPage()
   const pageWidth = doc.page.width - 100
   const left = 50
   const right = 420
 
-  // Header logo or fallback text
+  // Logo or fallback
   try {
     const logo = path.join(process.cwd(), "public", "nifar_logo.jpg")
     if (fs.existsSync(logo)) {
@@ -101,7 +93,7 @@ export async function generateInvoicePDF(invoice: Invoice): Promise<Buffer> {
   doc.text("info@pro-arbeitsschutz.com", right, 82, { align: "right" })
 
   // -----------------------------------------------------
-  // Invoice Header Info
+  // Invoice details
   // -----------------------------------------------------
   const invoiceNumber = invoice.invoiceNumber || "N/A"
   const orderDate = new Date(invoice.createdAt).toLocaleDateString("de-DE")
@@ -154,7 +146,7 @@ export async function generateInvoicePDF(invoice: Invoice): Promise<Buffer> {
   let subtotal = 0
   let pos = 1
   const rowHeight = 20
-  const maxY = 700 // bottom limit before new page
+  const maxY = 700
 
   for (const item of invoice.lineItems) {
     const lineTotal = (item.unitPrice || 0) * (item.quantity || 0)
@@ -209,7 +201,7 @@ export async function generateInvoicePDF(invoice: Invoice): Promise<Buffer> {
   doc.text("IBAN: DE90 5065 2124 0008 1426 22 | BIC: HELADEF1SLS", left, footerY + 12)
 
   // -----------------------------------------------------
-  // Return Buffer
+  // Return PDF Buffer
   // -----------------------------------------------------
   const buffer: Buffer = await new Promise((resolve, reject) => {
     doc.on("end", () => resolve(Buffer.concat(streamChunks)))
