@@ -46,7 +46,7 @@ export async function generateInvoicePDF(invoice: any): Promise<Buffer> {
         this._fontSize = 12
         this._font = null
         this._registeredFonts = {}
-        // 👇 prevent Helvetica.afm auto-load
+        // 👇 Prevent Helvetica.afm load
       }
       proto.__noCoreFontsPatched = true
       proto.__initFontsOriginal = original
@@ -56,11 +56,13 @@ export async function generateInvoicePDF(invoice: any): Promise<Buffer> {
     console.warn("[PDF] Font patch failed:", e)
   }
 
+  // ✅ Create doc & define chunks before using them
   const doc = new PDFDocument({ size: "A4", margin: 50, autoFirstPage: false })
-  const chunks: Buffer[] = []
-  doc.on("data", (chunk: Buffer) => chunks.push(Buffer.from(chunk)))
+  const streamChunks: Buffer[] = [] // ← define first!
 
-  // ✅ You can still call Helvetica safely
+  doc.on("data", (chunk: Buffer) => streamChunks.push(Buffer.from(chunk)))
+
+  // ✅ You can safely use Helvetica now
   doc.font("Helvetica")
 
   // Currency formatter (German / EUR)
@@ -208,6 +210,7 @@ export async function generateInvoicePDF(invoice: any): Promise<Buffer> {
   // -----------------------------------------------------
   // Return PDF Buffer
   // -----------------------------------------------------
+  // ✅ Finalize & return buffer
   const buffer: Buffer = await new Promise((resolve, reject) => {
     doc.on("end", () => resolve(Buffer.concat(streamChunks)))
     doc.on("error", reject)
