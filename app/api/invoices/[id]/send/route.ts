@@ -58,8 +58,16 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     })
   } catch (err) {
     console.error("Email send error:", err)
+    const anyErr = err as any
     return NextResponse.json(
-      { error: "Failed to send email", details: (err as Error).message },
+      { 
+        error: "Failed to send email", 
+        details: anyErr?.message || String(err),
+        code: anyErr?.code,
+        stage: anyErr?.stage,
+        cause: anyErr?.cause,
+        stack: anyErr?.stack
+      },
       { status: 500 }
     )
   }
