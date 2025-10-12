@@ -33,34 +33,35 @@ interface Invoice {
 // -----------------------------------------------------
 // Function
 // -----------------------------------------------------
-export async function generateInvoicePDF(invoice: Invoice): Promise<Buffer> {
-  // ✅ Patch Helvetica AFM issue for serverless environments
+export async function generateInvoicePDF(invoice: any): Promise<Buffer> {
+  // ✅ Patch PDFKit to skip Helvetica.afm lookup
   try {
     const AnyPDF: any = PDFDocument as any
     const proto = AnyPDF?.prototype
     if (proto && !proto.__noCoreFontsPatched) {
-        const original = proto.initFonts
-        proto.initFonts = function () {
+      const original = proto.initFonts
+      proto.initFonts = function () {
         this._fontFamilies = {}
         this._fontCount = 0
         this._fontSize = 12
         this._font = null
         this._registeredFonts = {}
-        // intentionally skip Helvetica default
-        }
-        proto.__noCoreFontsPatched = true
-        proto.__initFontsOriginal = original
+        // 👇 prevent Helvetica.afm auto-load
+      }
+      proto.__noCoreFontsPatched = true
+      proto.__initFontsOriginal = original
+      console.log("[PDF] Core font patch applied — Helvetica.afm disabled")
     }
   } catch (e) {
-    console.warn('[PDF] Font patch failed:', e)
+    console.warn("[PDF] Font patch failed:", e)
   }
 
-  const doc = new PDFDocument({ size: 'A4', margin: 50, autoFirstPage: false })
-  const streamChunks: Buffer[] = []
-  doc.on("data", (chunk: Buffer) => streamChunks.push(Buffer.from(chunk)))
+  const doc = new PDFDocument({ size: "A4", margin: 50, autoFirstPage: false })
+  const chunks: Buffer[] = []
+  doc.on("data", (chunk: Buffer) => chunks.push(Buffer.from(chunk)))
 
-  // ✅ Use Helvetica safely
-  doc.font('Helvetica')
+  // ✅ You can still call Helvetica safely
+  doc.font("Helvetica")
 
   // Currency formatter (German / EUR)
   const formatEUR = (v: number) =>
