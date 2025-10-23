@@ -4,17 +4,7 @@ const prisma = new PrismaClient()
 
 export async function generateNextInvoiceNumber(): Promise<string> {
   try {
-    // Get the next sequence value
-    const result = await prisma.$queryRaw<[{ nextval: bigint }]>`
-      SELECT nextval('invoice_number_seq') as nextval;
-    `
-    
-    const nextNumber = Number(result[0].nextval)
-    return nextNumber.toString().padStart(3, '0')
-  } catch (error) {
-    console.error('Error generating invoice number:', error)
-    
-    // Fallback: find the highest existing invoice number and increment
+    // Find the highest existing invoice number across ALL clients and increment
     const lastInvoice = await prisma.invoice.findFirst({
       where: {
         invoiceNumber: {
@@ -34,6 +24,16 @@ export async function generateNextInvoiceNumber(): Promise<string> {
     }
     
     const lastNumber = parseInt(lastInvoice.invoiceNumber)
-    return (lastNumber + 1).toString().padStart(3, '0')
+    if (isNaN(lastNumber)) {
+      return '001'
+    }
+    
+    const nextNumber = lastNumber + 1
+    return nextNumber.toString().padStart(3, '0')
+  } catch (error) {
+    console.error('Error generating global invoice number:', error)
+    
+    // Ultimate fallback
+    return '001'
   }
 }
