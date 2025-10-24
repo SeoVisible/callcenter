@@ -16,7 +16,7 @@ function computeTotals(invoice: InvoiceWithRelations) {
     (sum: number, item) => sum + item.total,
     0
   )
-  const taxAmount = subtotal * Number(invoice.taxRate)
+  const taxAmount = subtotal * (Number(invoice.taxRate) / 100)
   const total = subtotal + taxAmount
   return { subtotal, taxAmount, total, lineItemsWithTotal }
 }
@@ -240,7 +240,7 @@ export async function POST(req: Request) {
     profit: (Number(item.unitPrice) - Number(item.buyingPrice ?? 0)) * Number(item.quantity),
   }))
   const subtotal = lineItemsAugmented.reduce((sum: number, it: any) => sum + it.total, 0)
-  const taxAmount = subtotal * Number(invoice.taxRate)
+  const taxAmount = subtotal * (Number(invoice.taxRate) / 100)
   const total = subtotal + taxAmount
   const lineItemsWithTotal = lineItemsAugmented
     return NextResponse.json(addClientFields({ ...invoice, subtotal, taxAmount, total, lineItems: lineItemsWithTotal }));
